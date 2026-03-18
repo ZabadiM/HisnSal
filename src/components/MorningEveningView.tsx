@@ -47,7 +47,14 @@ const SortableItem = ({ item, index, isEditMode, handleIncrement, setShowDeleteC
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: index * 0.05 }}
           className={`glass-panel p-5 rounded-3xl transition-all duration-300 ${completed ? 'opacity-60 bg-primary/5' : ''} ${isEditMode ? 'border-2 border-accent cursor-grab' : ''}`}
-          onClick={() => isEditMode ? onEdit(item) : handleIncrement(item)}
+          onClick={() => {
+            if (isEditMode) {
+              const isBasic = item.id.startsWith('m') || item.id.startsWith('e');
+              if (!isBasic) onEdit(item);
+            } else {
+              handleIncrement(item);
+            }
+          }}
         >
           <div className="flex justify-between items-start mb-4 gap-4">
             <div className="flex-1">
@@ -57,12 +64,14 @@ const SortableItem = ({ item, index, isEditMode, handleIncrement, setShowDeleteC
             </div>
             {isEditMode && (
               <div className="flex gap-2">
-                <button 
-                  onClick={(e) => { e.stopPropagation(); onEdit(item); }}
-                  className="p-2 rounded-full bg-primary/10 text-primary/70 hover:bg-primary/20 transition-colors h-fit"
-                >
-                  <Edit2 size={18} />
-                </button>
+                {!(item.id.startsWith('m') || item.id.startsWith('e')) && (
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+                    className="p-2 rounded-full bg-primary/10 text-primary/70 hover:bg-primary/20 transition-colors h-fit"
+                  >
+                    <Edit2 size={18} />
+                  </button>
+                )}
                 <div className="flex flex-col gap-1 items-center">
                   <button 
                     onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(item.id); }}

@@ -102,6 +102,7 @@ export default function HisnMuslimView({ onClose }: Props) {
     }
     window.history.pushState({ category: category.id }, '');
     setSelectedCategory(category);
+    setSearchTerm(''); // Clear search term when a category is selected
     setTimeout(() => {
       if (mainRef.current) mainRef.current.scrollTop = 0;
     }, 10);

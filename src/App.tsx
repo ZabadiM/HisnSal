@@ -1554,37 +1554,32 @@ export default function App() {
                   exit={{ opacity: 0, x: '100%' }}
                   className="fixed inset-0 z-50 flex bg-secondary/95 backdrop-blur-md flex-col"
                 >
-                  <div className="p-6 flex items-center justify-between border-b border-primary/10 bg-secondary/80 backdrop-blur-sm sticky top-0 z-10 w-full max-w-md mx-auto">
-                    <h2 className="text-2xl font-bold font-serif">قائمة الأذكار</h2>
+                  <div className="p-4 flex items-center justify-between border-b border-primary/10 bg-secondary/80 backdrop-blur-sm sticky top-0 z-10 w-full max-w-md mx-auto">
+                    <h2 className="text-xl font-bold font-serif">قائمة الأذكار</h2>
                     <button onClick={closeOverlay} className="p-2 rounded-full hover:bg-primary/10 transition-colors">
-                      <X size={24} />
+                      <X size={20} />
                     </button>
                   </div>
-                  <div className="p-4 pb-0 flex flex-col gap-3 w-full max-w-md mx-auto">
-                    <div className="relative">
-                      <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-primary/40">
-                        <Search size={18} />
+                  <div className="p-3 pb-0 flex flex-col gap-2 w-full max-w-md mx-auto">
+                    <div className="flex gap-2 items-center">
+                      <div className="relative flex-1">
+                        <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-primary/40">
+                          <Search size={16} />
+                        </div>
+                        <input 
+                          type="text" 
+                          placeholder="ابحث عن ذكر..." 
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full bg-primary/5 border border-primary/10 rounded-xl py-2 pr-9 pl-4 text-sm focus:outline-none focus:border-primary/30 focus:bg-primary/10 transition-colors text-primary placeholder:text-primary/40"
+                        />
                       </div>
-                      <input 
-                        type="text" 
-                        placeholder="ابحث عن ذكر..." 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-primary/5 border border-primary/10 rounded-xl py-2.5 pr-10 pl-4 text-sm focus:outline-none focus:border-primary/30 focus:bg-primary/10 transition-colors text-primary placeholder:text-primary/40"
-                      />
-                    </div>
-                    <div className="flex gap-3">
                       <button 
-                        onClick={() => setListFilter('all')}
-                        className={`flex-1 py-2.5 rounded-xl font-medium transition-all ${listFilter === 'all' ? 'bg-primary text-secondary shadow-md' : 'bg-primary/5 text-primary/60 hover:bg-primary/10 hover:text-primary'}`}
+                        onClick={() => setListFilter(listFilter === 'favorites' ? 'all' : 'favorites')}
+                        className={`p-2.5 rounded-xl transition-all ${listFilter === 'favorites' ? 'bg-primary text-secondary shadow-md' : 'bg-primary/5 text-primary/60 hover:bg-primary/10 hover:text-primary'}`}
+                        title={listFilter === 'favorites' ? "عرض الكل" : "عرض المفضلة"}
                       >
-                        الكل
-                      </button>
-                      <button 
-                        onClick={() => setListFilter('favorites')}
-                        className={`flex-1 py-2.5 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${listFilter === 'favorites' ? 'bg-primary text-secondary shadow-md' : 'bg-primary/5 text-primary/60 hover:bg-primary/10 hover:text-primary'}`}
-                      >
-                        <Star size={16} fill={listFilter === 'favorites' ? "currentColor" : "none"} /> المفضلة
+                        <Star size={18} fill={listFilter === 'favorites' ? "currentColor" : "none"} />
                       </button>
                     </div>
                   </div>
