@@ -1,0 +1,7 @@
+{
+  "name": "HisnSal 2",
+  "description": "تسبيح، أذكار الصباح والمساء",
+  "requestFramePermissions": [
+    "screen-wake-lock"
+  ]
+}
