@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { ChevronRight, Sun, Moon, CheckCircle2, BookOpen } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ChevronRight, Sun, Moon, CheckCircle2, BookOpen, RotateCcw } from 'lucide-react';
 import { MORNING_ADHKAR, EVENING_ADHKAR, AdhkarItem } from '../data/morningEvening';
 
 interface Props {
@@ -26,6 +26,7 @@ export default function MorningEveningView({}: Props) {
     return {};
   });
   const [showVirtueFor, setShowVirtueFor] = useState<string | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   React.useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({ date: todayStr, data: progress }));
@@ -45,6 +46,7 @@ export default function MorningEveningView({}: Props) {
 
   const resetProgress = () => {
     setProgress({});
+    setShowResetConfirm(false);
   };
 
   const getProgress = (id: string) => progress[id] || 0;
@@ -81,8 +83,8 @@ export default function MorningEveningView({}: Props) {
           </button>
         </div>
 
-        <div className="mt-4 px-2">
-          <div className="h-4 bg-primary/10 rounded-full overflow-hidden relative flex items-center justify-center">
+        <div className="mt-4 px-2 flex items-center gap-2">
+          <div className="flex-1 h-4 bg-primary/10 rounded-full overflow-hidden relative flex items-center justify-center">
             <motion.div 
               className="absolute right-0 top-0 bottom-0 bg-accent"
               initial={{ width: 0 }}
@@ -93,8 +95,52 @@ export default function MorningEveningView({}: Props) {
               {completedCount} / {totalCount}
             </span>
           </div>
+          <button
+            onClick={() => setShowResetConfirm(true)}
+            className="p-2 rounded-xl hover:bg-primary/10 transition-colors text-primary/70"
+            title="تصفير التقدم"
+          >
+            <RotateCcw size={18} />
+          </button>
         </div>
       </header>
+
+      <AnimatePresence>
+        {showResetConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setShowResetConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-surface p-6 rounded-3xl shadow-xl max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold mb-4">تأكيد التصفير</h3>
+              <p className="text-primary/70 mb-6">هل أنت متأكد من أنك تريد تصفير تقدم أذكار {activeTab === 'morning' ? 'الصباح' : 'المساء'}؟</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="flex-1 py-3 rounded-xl bg-primary/10 font-bold"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={resetProgress}
+                  className="flex-1 py-3 rounded-xl bg-accent text-white font-bold"
+                >
+                  تصفير
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <main className="flex-1 overflow-y-auto scrollbar-hide p-4 pb-24 z-10 space-y-4 w-full max-w-md mx-auto">
         {currentList.map((item, index) => {

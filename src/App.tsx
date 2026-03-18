@@ -250,7 +250,7 @@ export default function App() {
     const handlePopState = (e: PopStateEvent) => {
       const state = e.state;
       if (state) {
-        setView(state.view || 'main');
+        if (state.view) setView(state.view);
         setShowList(state.modal === 'list');
         setShowVirtue(state.modal === 'virtue');
         setShowShareMenu(state.modal === 'share');
@@ -725,6 +725,7 @@ export default function App() {
       const generateImage = async () => {
         setIsGeneratingImage(true);
         try {
+          console.log('Generating image...');
           const watermark = shareRef.current?.querySelector('#watermark');
           const shareDetails = shareRef.current?.querySelector('#share-details');
           if (watermark) watermark.classList.remove('hidden');
@@ -754,6 +755,8 @@ export default function App() {
             }
           });
           
+          console.log('Image generated successfully', blob);
+          
           // Restore original styles
           shareRef.current.style.width = originalWidth;
           shareRef.current.style.maxWidth = originalMaxWidth;
@@ -765,6 +768,7 @@ export default function App() {
           setShareImageBlob(blob);
         } catch (error) {
           console.error('Error generating image:', error);
+          alert('حدث خطأ أثناء تجهيز الصورة: ' + error);
           setShareImageBlob(null);
         } finally {
           setIsGeneratingImage(false);
@@ -933,7 +937,7 @@ export default function App() {
     const chartData = generateChartData(chartPeriod);
 
     return (
-      <div className="h-[100dvh] flex flex-col items-center p-6 pb-24 bg-secondary text-primary overflow-hidden relative">
+      <div className="h-[100dvh] flex flex-col items-center p-6 bg-secondary text-primary overflow-hidden relative">
         {/* Background Decoration */}
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-accent/5 blur-3xl pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
@@ -2004,12 +2008,15 @@ function ManageDhikrView({
 
   const handleExport = () => {
     const dataStr = JSON.stringify(dhikrList, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
-    const exportFileDefaultName = 'dhikr_list.json';
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
     const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.href = url;
+    linkElement.download = 'dhikr_list.json';
+    document.body.appendChild(linkElement);
     linkElement.click();
+    document.body.removeChild(linkElement);
+    URL.revokeObjectURL(url);
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -2021,11 +2028,13 @@ function ManageDhikrView({
           const importedList = JSON.parse(e.target?.result as string);
           if (Array.isArray(importedList)) {
             setDhikrList(importedList);
+            alert('تم استيراد الأذكار بنجاح!');
           } else {
-            console.error('Invalid file format');
+            alert('ملف غير صالح');
           }
         } catch (error) {
           console.error('Error reading file', error);
+          alert('حدث خطأ أثناء قراءة الملف');
         }
       };
       reader.readAsText(file);

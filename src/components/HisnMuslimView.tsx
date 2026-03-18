@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronRight, ChevronLeft, Search, BookOpen, ChevronDown, Star, CheckCircle2 } from 'lucide-react';
+import { ChevronRight, ChevronLeft, Search, BookOpen, ChevronDown, Star, CheckCircle2, RotateCcw } from 'lucide-react';
 import { HISN_MUSLIM, HisnCategory } from '../data/hisnMuslim';
 import { HISN_MUSLIM_GROUPS, HISN_MUSLIM_GROUP_ORDER } from '../data/hisnMuslimGroups';
 
@@ -75,10 +75,27 @@ export default function HisnMuslimView({ onClose }: Props) {
 
   const isGroupExpanded = (group: string) => searchTerm !== '' || expandedGroups.includes(group);
 
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      if (e.state?.category) {
+        const category = HISN_MUSLIM.find(c => c.id === e.state.category);
+        setSelectedCategory(category || null);
+      } else {
+        setSelectedCategory(null);
+        setTimeout(() => {
+          if (mainRef.current) mainRef.current.scrollTop = scrollPosition;
+        }, 10);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [scrollPosition]);
+
   const handleCategorySelect = (category: HisnCategory) => {
     if (mainRef.current) {
       setScrollPosition(mainRef.current.scrollTop);
     }
+    window.history.pushState({ category: category.id }, '');
     setSelectedCategory(category);
     setTimeout(() => {
       if (mainRef.current) mainRef.current.scrollTop = 0;
@@ -87,13 +104,21 @@ export default function HisnMuslimView({ onClose }: Props) {
 
   const handleBack = () => {
     if (selectedCategory) {
-      setSelectedCategory(null);
-      setTimeout(() => {
-        if (mainRef.current) mainRef.current.scrollTop = scrollPosition;
-      }, 10);
+      window.history.back();
     } else {
       onClose();
     }
+  };
+
+  const resetCategoryProgress = () => {
+    if (!selectedCategory) return;
+    setProgress(prev => {
+      const newProgress = { ...prev };
+      selectedCategory.adhkar.forEach(item => {
+        delete newProgress[item.id];
+      });
+      return newProgress;
+    });
   };
 
   return (
@@ -113,7 +138,13 @@ export default function HisnMuslimView({ onClose }: Props) {
             <h1 className="text-xl font-bold font-serif">
               {selectedCategory.title}
             </h1>
-            <div className="w-10"></div> {/* Spacer */}
+            <button
+              onClick={resetCategoryProgress}
+              className="p-2 rounded-xl hover:bg-primary/10 transition-colors text-primary/70"
+              title="تصفير القسم"
+            >
+              <RotateCcw size={20} />
+            </button>
           </div>
         )}
 
