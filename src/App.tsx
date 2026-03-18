@@ -35,11 +35,14 @@ import {
   Share2,
   ImageIcon,
   Search,
-  FastForward
+  FastForward,
+  Download,
+  Upload
 } from 'lucide-react';
 import { toBlob } from 'html-to-image';
-import * as XLSX from 'xlsx';
 import { DHIKR_LIST as INITIAL_DHIKR_LIST, Dhikr } from './constants';
+import MorningEveningView from './components/MorningEveningView';
+import HisnMuslimView from './components/HisnMuslimView';
 import {
   BarChart,
   Bar,
@@ -118,7 +121,7 @@ const getDefaultTimerForDhikr = (dhikr: Dhikr | null | undefined): number => {
 };
 
 export default function App() {
-  const [view, setView] = useState<'main' | 'stats' | 'manage'>('main');
+  const [view, setView] = useState<'main' | 'stats' | 'manage' | 'morning_evening' | 'hisn_muslim'>('main');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mode, setMode] = useState<'counter' | 'timer'>('counter');
   
@@ -156,9 +159,12 @@ export default function App() {
   const [showAutoAdvanceSettings, setShowAutoAdvanceSettings] = useState(false);
   const [showResetMenu, setShowResetMenu] = useState(false);
   const [shareImageBlob, setShareImageBlob] = useState<Blob | null>(null);
+  const [showGeneratedImage, setShowGeneratedImage] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const shareRef = useRef<HTMLDivElement>(null);
   const [showList, setShowList] = useState(false);
+  const listScrollPositionRef = useRef(0);
+  const listRef = useRef<HTMLDivElement>(null);
   const [listFilter, setListFilter] = useState<'all' | 'favorites'>('all');
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -244,13 +250,14 @@ export default function App() {
     const handlePopState = (e: PopStateEvent) => {
       const state = e.state;
       if (state) {
-        setView(state.view || 'main');
+        if (state.view) setView(state.view);
         setShowList(state.modal === 'list');
         setShowVirtue(state.modal === 'virtue');
         setShowShareMenu(state.modal === 'share');
         setShowSoundSettings(state.modal === 'sound');
         setShowAutoAdvanceSettings(state.modal === 'autoAdvance');
         setShowResetMenu(state.modal === 'resetMenu');
+        setShowGeneratedImage(state.modal === 'generatedImage');
       } else {
         setView('main');
         setShowList(false);
@@ -259,6 +266,7 @@ export default function App() {
         setShowSoundSettings(false);
         setShowAutoAdvanceSettings(false);
         setShowResetMenu(false);
+        setShowGeneratedImage(false);
       }
     };
     
@@ -269,23 +277,21 @@ export default function App() {
     };
   }, []);
 
-  const changeView = (newView: 'main' | 'stats' | 'manage') => {
+  const changeView = (newView: 'main' | 'stats' | 'manage' | 'morning_evening' | 'hisn_muslim') => {
     if (newView === view) return;
     
-    if (newView === 'main') {
-      // If going to main, we can just push state or replace
-      window.history.pushState({ view: 'main', modal: null }, '');
+    if (view === 'main') {
+      window.history.pushState({ view: newView, modal: null }, '');
+      setView(newView);
+    } else if (newView === 'main') {
+      window.history.back();
     } else {
-      if (view === 'main') {
-        window.history.pushState({ view: newView, modal: null }, '');
-      } else {
-        window.history.replaceState({ view: newView, modal: null }, '');
-      }
+      window.history.replaceState({ view: newView, modal: null }, '');
+      setView(newView);
     }
-    setView(newView);
   };
 
-  const openModal = (modalName: 'list' | 'virtue' | 'share' | 'sound' | 'autoAdvance' | 'resetMenu') => {
+  const openModal = (modalName: 'list' | 'virtue' | 'share' | 'sound' | 'autoAdvance' | 'resetMenu' | 'generatedImage') => {
     window.history.pushState({ view: view, modal: modalName }, '');
     if (modalName === 'list') setShowList(true);
     if (modalName === 'virtue') setShowVirtue(true);
@@ -293,7 +299,19 @@ export default function App() {
     if (modalName === 'sound') setShowSoundSettings(true);
     if (modalName === 'autoAdvance') setShowAutoAdvanceSettings(true);
     if (modalName === 'resetMenu') setShowResetMenu(true);
+    if (modalName === 'generatedImage') setShowGeneratedImage(true);
   };
+
+  useEffect(() => {
+    if (showList && listRef.current) {
+      // Use a small timeout to ensure the DOM is fully rendered before scrolling
+      setTimeout(() => {
+        if (listRef.current) {
+          listRef.current.scrollTop = listScrollPositionRef.current;
+        }
+      }, 50);
+    }
+  }, [showList]);
 
   const closeOverlay = () => {
     // We just go back in history, which will trigger popstate and close the modal
@@ -301,6 +319,7 @@ export default function App() {
   };
   
   // Persistent Stats
+  const [chartPeriod, setChartPeriod] = useState<'week' | 'month' | 'year' | 'all'>('week');
   const [dailyStats, setDailyStats] = useState<DailyStats>(() => {
     try {
       const saved = localStorage.getItem('tasbih_stats');
@@ -586,28 +605,6 @@ export default function App() {
     closeOverlay();
   };
 
-  const exportToExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(dhikrList);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "الأذكار");
-    XLSX.writeFile(workbook, "الأذكار.xlsx");
-  };
-
-  const importFromExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const data = evt.target?.result;
-      const workbook = XLSX.read(data, { type: 'binary' });
-      const worksheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[worksheetName];
-      const json = XLSX.utils.sheet_to_json(worksheet);
-      setDhikrList(json as Dhikr[]);
-    };
-    reader.readAsBinaryString(file);
-  };
-
   const toggleFavorite = (id: string) => {
     setDhikrList(prev => prev.map(d => d.id === id ? { ...d, isFavorite: !d.isFavorite } : d));
   };
@@ -712,17 +709,15 @@ export default function App() {
     }
     
     if (!shared) {
-      const url = URL.createObjectURL(shareImageBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'dhikr.png';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Close share menu first
+      closeOverlay();
+      // Wait a bit for the history state to settle before opening the new modal
+      setTimeout(() => {
+        openModal('generatedImage');
+      }, 50);
+    } else {
+      closeOverlay();
     }
-    
-    closeOverlay();
   };
 
   useEffect(() => {
@@ -730,6 +725,7 @@ export default function App() {
       const generateImage = async () => {
         setIsGeneratingImage(true);
         try {
+          console.log('Generating image...');
           const watermark = shareRef.current?.querySelector('#watermark');
           const shareDetails = shareRef.current?.querySelector('#share-details');
           if (watermark) watermark.classList.remove('hidden');
@@ -759,6 +755,8 @@ export default function App() {
             }
           });
           
+          console.log('Image generated successfully', blob);
+          
           // Restore original styles
           shareRef.current.style.width = originalWidth;
           shareRef.current.style.maxWidth = originalMaxWidth;
@@ -770,6 +768,7 @@ export default function App() {
           setShareImageBlob(blob);
         } catch (error) {
           console.error('Error generating image:', error);
+          alert('حدث خطأ أثناء تجهيز الصورة: ' + error);
           setShareImageBlob(null);
         } finally {
           setIsGeneratingImage(false);
@@ -845,8 +844,8 @@ export default function App() {
       const dayStats = dailyStats[dateStr];
       if (dayStats) {
         Object.values(dayStats).forEach((stat: any) => {
-          totalCount += stat.count;
-          totalTime += stat.timeSpent;
+          totalCount += (stat.count || 0);
+          totalTime += (stat.timeSpent || 0);
         });
       }
     }
@@ -858,36 +857,9 @@ export default function App() {
   const monthStats = getStatsForPeriod(30);
   const yearStats = getStatsForPeriod(365);
 
-  let maxCount = 0;
-  let maxTime = 0;
-  let topDhikrIdByCount = '';
-  let topDhikrIdByTime = '';
-  const allTimeDhikrCounts: Record<string, number> = {};
-  const allTimeDhikrTimes: Record<string, number> = {};
+
   
-  Object.values(dailyStats).forEach(day => {
-    Object.entries(day).forEach(([id, stat]: [string, any]) => {
-      allTimeDhikrCounts[id] = (allTimeDhikrCounts[id] || 0) + stat.count;
-      allTimeDhikrTimes[id] = (allTimeDhikrTimes[id] || 0) + stat.timeSpent;
-    });
-  });
-  
-  Object.entries(allTimeDhikrCounts).forEach(([id, count]) => {
-    if (count > maxCount) {
-      maxCount = count;
-      topDhikrIdByCount = id;
-    }
-  });
-  
-  Object.entries(allTimeDhikrTimes).forEach(([id, time]) => {
-    if (time > maxTime) {
-      maxTime = time;
-      topDhikrIdByTime = id;
-    }
-  });
-  
-  const topDhikrByCount = dhikrList.find(d => d.id === topDhikrIdByCount) || INITIAL_DHIKR_LIST.find(d => d.id === topDhikrIdByCount);
-  const topDhikrByTime = dhikrList.find(d => d.id === topDhikrIdByTime) || INITIAL_DHIKR_LIST.find(d => d.id === topDhikrIdByTime);
+
 
   // --- Render Manage View ---
   if (view === 'manage') {
@@ -895,99 +867,89 @@ export default function App() {
       dhikrList={dhikrList} 
       setDhikrList={setDhikrList} 
       onClose={closeOverlay} 
-      exportToExcel={exportToExcel}
-      importFromExcel={importFromExcel}
     />;
+  }
+
+  // --- Render Morning & Evening View ---
+  if (view === 'morning_evening') {
+    return (
+      <>
+        <MorningEveningView />
+        <BottomNav currentView={view} onChangeView={changeView} />
+      </>
+    );
+  }
+
+  // --- Render Hisn Muslim View ---
+  if (view === 'hisn_muslim') {
+    return (
+      <>
+        <HisnMuslimView onClose={() => changeView('main')} />
+        <BottomNav currentView={view} onChangeView={changeView} />
+      </>
+    );
   }
 
   // --- Render Statistics View ---
   if (view === 'stats') {
-    const last7DaysData = Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (6 - i));
-      const dateStr = getLocalDateStr(d);
-      const dayStats = dailyStats[dateStr] || {};
-      const totalCount = Object.values(dayStats).reduce((acc: number, curr: any) => acc + Number(curr.count), 0);
-      const totalTime = Object.values(dayStats).reduce((acc: number, curr: any) => acc + Number(curr.timeSpent), 0);
-      return {
-        name: `${d.getDate()}/${d.getMonth() + 1}`,
-        count: totalCount,
-        time: Math.round(Number(totalTime) / 60) // in minutes for chart
-      };
-    });
+    const generateChartData = (period: 'week' | 'month' | 'year' | 'all') => {
+      let length = 7;
+      let step = 1; // in days
+      let formatLabel = (d: Date) => `${d.getDate()}/${d.getMonth() + 1}`;
 
-    const last30DaysData = Array.from({ length: 30 }).map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - (29 - i));
-      const dateStr = getLocalDateStr(d);
-      const dayStats = dailyStats[dateStr] || {};
-      const totalCount = Object.values(dayStats).reduce((acc: number, curr: any) => acc + Number(curr.count), 0);
-      const totalTime = Object.values(dayStats).reduce((acc: number, curr: any) => acc + Number(curr.timeSpent), 0);
-      return {
-        name: `${d.getDate()}/${d.getMonth() + 1}`,
-        count: totalCount,
-        time: Math.round(Number(totalTime) / 60) // in minutes for chart
-      };
-    });
+      if (period === 'month') {
+        length = 30;
+      } else if (period === 'year') {
+        length = 12;
+        step = 30; // approx month
+        formatLabel = (d: Date) => `${d.getMonth() + 1}/${d.getFullYear().toString().slice(2)}`;
+      } else if (period === 'all') {
+        length = 5; // last 5 years
+        step = 365;
+        formatLabel = (d: Date) => `${d.getFullYear()}`;
+      }
+
+      return Array.from({ length }).map((_, i) => {
+        const d = new Date();
+        d.setDate(d.getDate() - ((length - 1 - i) * step));
+        
+        let totalCount = 0;
+        let totalTime = 0;
+
+        // aggregate over the step
+        for (let j = 0; j < step; j++) {
+          const stepDate = new Date(d);
+          stepDate.setDate(d.getDate() - j);
+          const dateStr = getLocalDateStr(stepDate);
+          const dayStats = dailyStats[dateStr] || {};
+          totalCount += Number(Object.values(dayStats).reduce((acc: number, curr: any) => acc + Number(curr.count || 0), 0));
+          totalTime += Number(Object.values(dayStats).reduce((acc: number, curr: any) => acc + Number(curr.timeSpent || 0), 0));
+        }
+
+        return {
+          name: formatLabel(d),
+          count: totalCount,
+          time: Math.round(Number(totalTime) / 60) // in minutes for chart
+        };
+      });
+    };
+
+    const chartData = generateChartData(chartPeriod);
 
     return (
-      <div className="min-h-screen flex flex-col items-center p-6 bg-secondary text-primary overflow-y-auto relative">
+      <div className="h-[100dvh] flex flex-col items-center p-6 bg-secondary text-primary overflow-hidden relative">
         {/* Background Decoration */}
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-accent/5 blur-3xl pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
 
-        <header className="w-full max-w-md flex justify-between items-center mb-6 z-10 glass-panel px-6 py-4 rounded-2xl">
+        <header className="w-full max-w-md flex justify-between items-center mb-6 z-10 glass-panel px-6 py-4 rounded-2xl shrink-0">
           <h1 className="text-2xl font-bold font-serif">إحصائيات الإنجاز</h1>
-          <button onClick={closeOverlay} className="p-2 rounded-full hover:bg-primary/10 transition-colors">
+          <button onClick={() => changeView('main')} className="p-2 rounded-full hover:bg-primary/10 transition-colors">
             <X size={24} />
           </button>
         </header>
 
-        <main className="w-full max-w-md flex flex-col gap-6 pb-8 z-10">
-          <div className="glass-panel p-6 rounded-3xl relative overflow-hidden bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
-            <div className="absolute -left-4 -top-4 text-accent/10 transform -scale-x-100">
-              <Trophy size={140} />
-            </div>
-            <div className="relative z-10 flex flex-col gap-6">
-              <div>
-                <div className="flex items-center gap-3 mb-4 text-accent">
-                  <div className="p-2 bg-accent/10 rounded-xl">
-                    <Trophy size={20} />
-                  </div>
-                  <h2 className="text-lg font-bold">أكثر ذكر تكراراً</h2>
-                </div>
-                <p className="text-2xl md:text-3xl font-serif arabic-text text-primary mb-4 leading-relaxed">
-                  {topDhikrByCount ? topDhikrByCount.text : 'لا يوجد بيانات بعد'}
-                </p>
-                <div className="inline-flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-xl border border-primary/10">
-                  <Award size={16} className="text-accent" />
-                  <span className="text-sm font-bold text-primary/80">
-                    مجموع التكرار: <span className="text-primary">{maxCount}</span> مرة
-                  </span>
-                </div>
-              </div>
-              
-              <div className="h-px w-full bg-primary/10"></div>
-              
-              <div>
-                <div className="flex items-center gap-3 mb-4 text-blue-500">
-                  <div className="p-2 bg-blue-500/10 rounded-xl">
-                    <Clock size={20} />
-                  </div>
-                  <h2 className="text-lg font-bold">أكثر ذكر وقتاً</h2>
-                </div>
-                <p className="text-2xl md:text-3xl font-serif arabic-text text-primary mb-4 leading-relaxed">
-                  {topDhikrByTime ? topDhikrByTime.text : 'لا يوجد بيانات بعد'}
-                </p>
-                <div className="inline-flex items-center gap-2 bg-primary/5 px-4 py-2 rounded-xl border border-primary/10">
-                  <Clock size={16} className="text-blue-500" />
-                  <span className="text-sm font-bold text-primary/80">
-                    مجموع الوقت: <span className="text-primary">{formatDuration(maxTime)}</span>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
+        <main className="w-full max-w-md flex flex-col gap-6 pb-8 z-10 flex-1 overflow-y-auto scrollbar-hide pr-2">
 
           <div className="grid grid-cols-2 gap-4">
             <StatCard title="اليوم" stats={todayStats} icon={<Clock size={20} className="text-blue-500" />} />
@@ -997,13 +959,25 @@ export default function App() {
           </div>
 
           <div className="glass-panel p-6 rounded-3xl">
-            <div className="flex items-center gap-3 mb-6 text-primary">
-              <BarChart3 size={20} />
-              <h2 className="text-lg font-bold">نشاط آخر 7 أيام</h2>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3 text-primary">
+                <BarChart3 size={20} />
+                <h2 className="text-lg font-bold">نشاط التكرار</h2>
+              </div>
+              <select 
+                value={chartPeriod}
+                onChange={(e) => setChartPeriod(e.target.value as any)}
+                className="bg-primary/5 border border-primary/10 rounded-xl px-3 py-1.5 text-sm outline-none"
+              >
+                <option value="week">أسبوع</option>
+                <option value="month">شهر</option>
+                <option value="year">سنة</option>
+                <option value="all">سنوات</option>
+              </select>
             </div>
             <div className="h-48 w-full" dir="ltr">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={last7DaysData}>
+                <BarChart data={chartData}>
                   <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'currentColor' }} tickLine={false} axisLine={false} opacity={0.6} />
                   <Tooltip 
                     cursor={{ fill: 'var(--color-primary)', opacity: 0.05 }}
@@ -1012,20 +986,31 @@ export default function App() {
                     itemStyle={{ color: 'var(--color-primary)' }}
                   />
                   <Bar dataKey="count" fill="var(--color-accent)" radius={[6, 6, 0, 0]} name="التسبيحات" />
-                  <Bar dataKey="time" fill="#3b82f6" radius={[6, 6, 0, 0]} name="الدقائق" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
 
           <div className="glass-panel p-6 rounded-3xl">
-            <div className="flex items-center gap-3 mb-6 text-primary">
-              <BarChart3 size={20} />
-              <h2 className="text-lg font-bold">توجه آخر 30 يوم</h2>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3 text-primary">
+                <Clock size={20} />
+                <h2 className="text-lg font-bold">نشاط الوقت (دقائق)</h2>
+              </div>
+              <select 
+                value={chartPeriod}
+                onChange={(e) => setChartPeriod(e.target.value as any)}
+                className="bg-primary/5 border border-primary/10 rounded-xl px-3 py-1.5 text-sm outline-none"
+              >
+                <option value="week">أسبوع</option>
+                <option value="month">شهر</option>
+                <option value="year">سنة</option>
+                <option value="all">سنوات</option>
+              </select>
             </div>
             <div className="h-48 w-full" dir="ltr">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={last30DaysData}>
+                <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.1} />
                   <XAxis 
                     dataKey="name" 
@@ -1041,15 +1026,6 @@ export default function App() {
                     contentStyle={{ borderRadius: '16px', border: '1px solid rgba(0,0,0,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.1)', backgroundColor: 'var(--color-surface)' }}
                     labelStyle={{ color: 'var(--color-primary)', fontWeight: 'bold', marginBottom: '4px' }}
                     itemStyle={{ color: 'var(--color-primary)' }}
-                  />
-                  <Line 
-                    type="monotone" 
-                    dataKey="count" 
-                    stroke="var(--color-accent)" 
-                    strokeWidth={3} 
-                    dot={false}
-                    activeDot={{ r: 6, fill: 'var(--color-accent)', stroke: 'var(--color-surface)', strokeWidth: 2 }}
-                    name="التسبيحات" 
                   />
                   <Line 
                     type="monotone" 
@@ -1071,7 +1047,7 @@ export default function App() {
 
   // --- Render Main View ---
   return (
-    <div className="min-h-screen flex flex-col items-center justify-between p-6 bg-secondary text-primary overflow-hidden relative">
+    <div className="h-[100dvh] flex flex-col items-center justify-between pt-6 px-6 pb-0 bg-secondary text-primary overflow-hidden relative">
       {/* Background Decoration */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-accent/5 blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
@@ -1127,7 +1103,7 @@ export default function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 w-full max-w-md flex flex-col items-center justify-center gap-8 z-10">
+      <main className="flex-1 min-h-0 w-full max-w-md flex flex-col items-center gap-8 z-10 overflow-y-auto scrollbar-hide py-4 pb-24">
         
         {dhikrList.length === 0 ? (
           <div className="text-center p-8 glass-panel rounded-3xl w-full">
@@ -1141,31 +1117,29 @@ export default function App() {
           </div>
         ) : (
           <>
-            {!showList && (
-              <div className="flex justify-center gap-2 w-full mb-[-1.5rem] z-20 relative px-4">
-                <button 
-                  onClick={() => setFontSize(f => Math.min(f + 4, 72))} 
-                  className="w-10 h-10 flex items-center justify-center text-primary/60 hover:text-primary transition-colors font-bold text-lg rounded-full glass-panel hover:bg-primary/5 shrink-0"
-                  title="تكبير الخط"
-                >
-                  A+
-                </button>
-                <button 
-                  onClick={() => openModal('autoAdvance')}
-                  className={`px-4 h-10 flex items-center justify-center rounded-full glass-panel transition-colors text-sm font-bold ${(autoAdvanceSettings.counter || autoAdvanceSettings.timerTimeUp || autoAdvanceSettings.timerTargetReached) ? 'bg-primary/10 text-primary border-primary/20' : 'text-primary/60 hover:text-primary hover:bg-primary/5'}`}
-                  title="إعدادات الانتقال التلقائي"
-                >
-                  الانتقال التلقائي
-                </button>
-                <button 
-                  onClick={() => setFontSize(f => Math.max(f - 4, 16))} 
-                  className="w-10 h-10 flex items-center justify-center text-primary/60 hover:text-primary transition-colors font-bold text-sm rounded-full glass-panel hover:bg-primary/5 shrink-0"
-                  title="تصغير الخط"
-                >
-                  A-
-                </button>
-              </div>
-            )}
+            <div className="flex justify-center gap-2 w-full mb-[-1.5rem] z-20 relative px-4">
+              <button 
+                onClick={() => setFontSize(f => Math.min(f + 4, 72))} 
+                className="w-10 h-10 flex items-center justify-center text-primary/60 hover:text-primary transition-colors font-bold text-lg rounded-full glass-panel hover:bg-primary/5 shrink-0"
+                title="تكبير الخط"
+              >
+                A+
+              </button>
+              <button 
+                onClick={() => openModal('autoAdvance')}
+                className={`px-4 h-10 flex items-center justify-center rounded-full glass-panel transition-colors text-sm font-bold ${(autoAdvanceSettings.counter || autoAdvanceSettings.timerTimeUp || autoAdvanceSettings.timerTargetReached) ? 'bg-primary/10 text-primary border-primary/20' : 'text-primary/60 hover:text-primary hover:bg-primary/5'}`}
+                title="إعدادات الانتقال التلقائي"
+              >
+                الانتقال التلقائي
+              </button>
+              <button 
+                onClick={() => setFontSize(f => Math.max(f - 4, 16))} 
+                className="w-10 h-10 flex items-center justify-center text-primary/60 hover:text-primary transition-colors font-bold text-sm rounded-full glass-panel hover:bg-primary/5 shrink-0"
+                title="تصغير الخط"
+              >
+                A-
+              </button>
+            </div>
             {/* Dhikr Selector */}
             <div className="w-full flex items-center justify-between gap-4">
               <button onClick={prevDhikr} className="p-3 rounded-2xl glass-panel hover:bg-primary/5 transition-colors">
@@ -1405,7 +1379,7 @@ export default function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-md"
+                  className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/40 backdrop-blur-md"
                   onClick={closeOverlay}
                 >
                   <motion.div 
@@ -1444,6 +1418,62 @@ export default function App() {
               )}
             </AnimatePresence>
 
+            {/* Generated Image Modal */}
+            <AnimatePresence>
+              {showGeneratedImage && shareImageBlob && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
+                  onClick={closeOverlay}
+                >
+                  <motion.div 
+                    initial={{ scale: 0.9, y: 20 }}
+                    animate={{ scale: 1, y: 0 }}
+                    exit={{ scale: 0.9, y: 20 }}
+                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
+                    className="bg-secondary rounded-3xl p-4 max-w-sm w-full shadow-2xl space-y-4 text-center relative max-h-[90vh] flex flex-col"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <button 
+                      onClick={closeOverlay}
+                      className="absolute top-2 right-2 p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors z-10"
+                    >
+                      <X size={20} />
+                    </button>
+                    <h3 className="text-lg font-bold font-serif mb-2 text-primary">الصورة جاهزة</h3>
+                    <p className="text-sm text-primary/70 mb-4">اضغط مطولاً على الصورة لحفظها أو مشاركتها</p>
+                    <div className="flex-1 overflow-y-auto rounded-xl border border-primary/10 bg-primary/5 p-2 scrollbar-hide">
+                      <img 
+                        src={URL.createObjectURL(shareImageBlob)} 
+                        alt="ذكر" 
+                        className="w-full h-auto rounded-lg shadow-sm" 
+                        onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
+                      />
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const url = URL.createObjectURL(shareImageBlob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'dhikr.png';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                        closeOverlay();
+                      }}
+                      className="w-full py-3 bg-primary text-secondary rounded-xl font-bold shadow-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Share2 size={18} />
+                      تنزيل الصورة
+                    </button>
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Virtue Modal/Overlay */}
             <AnimatePresence>
               {showVirtue && currentDhikr && (
@@ -1473,7 +1503,7 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+                    <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 scrollbar-hide">
                       {currentDhikr.virtue && (
                         <p className="text-lg text-primary font-medium leading-relaxed">
                           {currentDhikr.virtue}
@@ -1524,13 +1554,13 @@ export default function App() {
                   exit={{ opacity: 0, x: '100%' }}
                   className="fixed inset-0 z-50 flex bg-secondary/95 backdrop-blur-md flex-col"
                 >
-                  <div className="p-6 flex items-center justify-between border-b border-primary/10 bg-secondary/80 backdrop-blur-sm sticky top-0 z-10">
+                  <div className="p-6 flex items-center justify-between border-b border-primary/10 bg-secondary/80 backdrop-blur-sm sticky top-0 z-10 w-full max-w-md mx-auto">
                     <h2 className="text-2xl font-bold font-serif">قائمة الأذكار</h2>
                     <button onClick={closeOverlay} className="p-2 rounded-full hover:bg-primary/10 transition-colors">
                       <X size={24} />
                     </button>
                   </div>
-                  <div className="p-4 pb-0 flex flex-col gap-3">
+                  <div className="p-4 pb-0 flex flex-col gap-3 w-full max-w-md mx-auto">
                     <div className="relative">
                       <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-primary/40">
                         <Search size={18} />
@@ -1558,7 +1588,13 @@ export default function App() {
                       </button>
                     </div>
                   </div>
-                  <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+                  <div 
+                    ref={listRef}
+                    onScroll={(e) => {
+                      listScrollPositionRef.current = e.currentTarget.scrollTop;
+                    }}
+                    className="flex-1 overflow-y-auto p-4 pb-12 space-y-3 scrollbar-hide w-full max-w-md mx-auto"
+                  >
                     {dhikrList.map((dhikr, idx) => {
                       if (listFilter === 'favorites' && !dhikr.isFavorite) return null;
                       if (searchTerm && !normalizeArabic(dhikr.text).includes(normalizeArabic(searchTerm))) return null;
@@ -1786,57 +1822,58 @@ export default function App() {
               >
                 <RotateCcw size={24} />
               </button>
+
+              {/* Footer / Info */}
+              <footer className="w-full text-center mt-8 pb-8">
+                {dhikrList.length > 0 && (
+                  <>
+                    <div className="flex justify-center flex-wrap px-4 mb-1">
+                      {dhikrList.map((dhikr, idx) => {
+                        const dhikrToday = dailyStats[todayStr]?.[dhikr.id];
+                        const dhikrCount = dhikrToday?.sessionCount !== undefined ? dhikrToday.sessionCount : (dhikrToday?.count || 0);
+                        const dhikrTime = dhikrToday?.sessionTimeSpent !== undefined ? dhikrToday.sessionTimeSpent : (dhikrToday?.timeSpent || 0);
+                        
+                        let isCompleted = false;
+                        if (mode === 'counter') {
+                          isCompleted = dhikrCount >= (dhikr.target || 100);
+                        } else {
+                          isCompleted = dhikrTime >= getDefaultTimerForDhikr(dhikr);
+                        }
+
+                        let colorClass = '';
+                        if (isCompleted) {
+                          colorClass = 'bg-green-500 group-hover:bg-green-400';
+                        } else if (dhikr.isFavorite) {
+                          colorClass = 'bg-yellow-500 group-hover:bg-yellow-400';
+                        } else if (idx === currentIndex) {
+                          colorClass = 'bg-primary group-hover:bg-primary/80';
+                        } else {
+                          colorClass = 'bg-primary/20 group-hover:bg-primary/50';
+                        }
+
+                        return (
+                          <button 
+                            key={idx}
+                            onClick={() => jumpToDhikr(idx)}
+                            className="py-3 px-1.5 group cursor-pointer"
+                            aria-label={`الانتقال إلى الذكر ${idx + 1}`}
+                          >
+                            <div className={`h-1.5 rounded-full transition-all duration-500 ${idx === currentIndex ? 'w-8' : 'w-2'} ${colorClass}`} />
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[11px] font-medium text-primary/50 uppercase tracking-[0.2em]">
+                      {currentIndex + 1} من {dhikrList.length} أذكار
+                    </p>
+                  </>
+                )}
+              </footer>
             </div>
           </>
         )}
       </main>
-
-      {/* Footer / Info */}
-      <footer className="w-full max-w-md text-center mt-8 z-10">
-        {dhikrList.length > 0 && (
-          <>
-            <div className="flex justify-center flex-wrap px-4 mb-1">
-              {dhikrList.map((dhikr, idx) => {
-                const dhikrToday = dailyStats[todayStr]?.[dhikr.id];
-                const dhikrCount = dhikrToday?.sessionCount !== undefined ? dhikrToday.sessionCount : (dhikrToday?.count || 0);
-                const dhikrTime = dhikrToday?.sessionTimeSpent !== undefined ? dhikrToday.sessionTimeSpent : (dhikrToday?.timeSpent || 0);
-                
-                let isCompleted = false;
-                if (mode === 'counter') {
-                  isCompleted = dhikrCount >= (dhikr.target || 100);
-                } else {
-                  isCompleted = dhikrTime >= getDefaultTimerForDhikr(dhikr);
-                }
-
-                let colorClass = '';
-                if (isCompleted) {
-                  colorClass = 'bg-green-500 group-hover:bg-green-400';
-                } else if (dhikr.isFavorite) {
-                  colorClass = 'bg-yellow-500 group-hover:bg-yellow-400';
-                } else if (idx === currentIndex) {
-                  colorClass = 'bg-primary group-hover:bg-primary/80';
-                } else {
-                  colorClass = 'bg-primary/20 group-hover:bg-primary/50';
-                }
-
-                return (
-                  <button 
-                    key={idx}
-                    onClick={() => jumpToDhikr(idx)}
-                    className="py-3 px-1.5 group cursor-pointer"
-                    aria-label={`الانتقال إلى الذكر ${idx + 1}`}
-                  >
-                    <div className={`h-1.5 rounded-full transition-all duration-500 ${idx === currentIndex ? 'w-8' : 'w-2'} ${colorClass}`} />
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[11px] font-medium text-primary/50 uppercase tracking-[0.2em]">
-              {currentIndex + 1} من {dhikrList.length} أذكار
-            </p>
-          </>
-        )}
-      </footer>
+      <BottomNav currentView={view} onChangeView={changeView} />
     </div>
   );
 }
@@ -1864,19 +1901,34 @@ function StatCard({ title, stats, icon }: { title: string, stats: { count: numbe
   );
 }
 
+// Helper component for Bottom Navigation
+function BottomNav({ currentView, onChangeView }: { currentView: string, onChangeView: (v: any) => void }) {
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-40 bg-secondary/90 backdrop-blur-md border-t border-primary/10 pb-safe">
+      <div className="max-w-md mx-auto flex justify-around items-center p-2">
+        <button onClick={() => onChangeView('main')} className={`flex items-center justify-center p-3 rounded-2xl transition-all ${currentView === 'main' ? 'text-accent bg-primary/10 scale-110' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`}>
+          <Hash size={24} />
+        </button>
+        <button onClick={() => onChangeView('morning_evening')} className={`flex items-center justify-center p-3 rounded-2xl transition-all ${currentView === 'morning_evening' ? 'text-accent bg-primary/10 scale-110' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`}>
+          <Sun size={24} />
+        </button>
+        <button onClick={() => onChangeView('hisn_muslim')} className={`flex items-center justify-center p-3 rounded-2xl transition-all ${currentView === 'hisn_muslim' ? 'text-accent bg-primary/10 scale-110' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`}>
+          <BookOpen size={24} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // --- Manage Dhikr View Component ---
 function ManageDhikrView({ 
   dhikrList, 
   setDhikrList, 
-  onClose,
-  exportToExcel,
-  importFromExcel
+  onClose 
 }: { 
   dhikrList: Dhikr[], 
   setDhikrList: React.Dispatch<React.SetStateAction<Dhikr[]>>,
-  onClose: () => void,
-  exportToExcel: () => void,
-  importFromExcel: (e: React.ChangeEvent<HTMLInputElement>) => void
+  onClose: () => void 
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Dhikr>>({});
@@ -1954,20 +2006,66 @@ function ManageDhikrView({
     setDhikrList(prev => prev.map(d => d.id === id ? { ...d, isFavorite: !d.isFavorite } : d));
   };
 
+  const handleExport = () => {
+    const dataStr = JSON.stringify(dhikrList, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const linkElement = document.createElement('a');
+    linkElement.href = url;
+    linkElement.download = 'dhikr_list.json';
+    document.body.appendChild(linkElement);
+    linkElement.click();
+    document.body.removeChild(linkElement);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedList = JSON.parse(e.target?.result as string);
+          if (Array.isArray(importedList)) {
+            setDhikrList(importedList);
+            alert('تم استيراد الأذكار بنجاح!');
+          } else {
+            alert('ملف غير صالح');
+          }
+        } catch (error) {
+          console.error('Error reading file', error);
+          alert('حدث خطأ أثناء قراءة الملف');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
   return (
-    <div className="min-h-screen flex flex-col items-center p-6 bg-secondary text-primary overflow-y-auto relative">
+    <div className="h-[100dvh] flex flex-col items-center p-6 bg-secondary text-primary overflow-hidden relative">
       {/* Background Decoration */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-accent/5 blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
 
-      <header className="w-full max-w-md flex justify-between items-center mb-8 z-10 glass-panel px-6 py-4 rounded-2xl">
+      <header className="w-full max-w-md flex justify-between items-center mb-8 z-10 glass-panel px-6 py-4 rounded-2xl shrink-0">
         <h1 className="text-2xl font-bold font-serif">إدارة الأذكار</h1>
-        <button onClick={onClose} className="p-2 rounded-full hover:bg-primary/10 transition-colors">
-          <X size={24} />
-        </button>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1 p-2 rounded-xl hover:bg-primary/10 transition-colors cursor-pointer text-sm font-medium" title="استيراد">
+            <input type="file" accept=".json" className="hidden" onChange={handleImport} />
+            <Download size={18} />
+            <span>استيراد</span>
+          </label>
+          <button onClick={handleExport} className="flex items-center gap-1 p-2 rounded-xl hover:bg-primary/10 transition-colors text-sm font-medium" title="تصدير">
+            <Upload size={18} />
+            <span>تصدير</span>
+          </button>
+          <button onClick={onClose} className="p-2 rounded-full hover:bg-primary/10 transition-colors mr-2">
+            <X size={24} />
+          </button>
+        </div>
       </header>
 
-      <main className="w-full max-w-md flex flex-col gap-4 pb-8 z-10">
+      <main className="w-full max-w-md flex flex-col gap-4 pb-8 z-10 flex-1 overflow-y-auto scrollbar-hide pr-2">
         {/* Modals */}
         <AnimatePresence>
           {editingId && (
@@ -2138,24 +2236,12 @@ function ManageDhikrView({
           >
             <Plus size={18} /> إضافة ذكر
           </button>
-          <div className="flex gap-2">
-            <button 
-              onClick={exportToExcel}
-              className="px-3 py-2.5 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors"
-            >
-              تصدير
-            </button>
-            <label className="px-3 py-2.5 bg-primary/10 text-primary rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors cursor-pointer">
-              استيراد
-              <input type="file" accept=".xlsx" onChange={(e) => importFromExcel(e)} className="hidden" />
-            </label>
-            <button 
-              onClick={handleResetToDefault}
-              className="text-sm text-primary/60 hover:text-primary underline transition-colors"
-            >
-              استعادة الافتراضي
-            </button>
-          </div>
+          <button 
+            onClick={handleResetToDefault}
+            className="text-sm text-primary/60 hover:text-primary underline transition-colors"
+          >
+            استعادة الافتراضي
+          </button>
         </div>
 
         <div className="space-y-3">
