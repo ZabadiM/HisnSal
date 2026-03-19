@@ -16,6 +16,7 @@ import {
   Volume2, 
   VolumeX,
   BookOpen,
+  Heart,
   Menu,
   X,
   BarChart3,
@@ -44,6 +45,7 @@ import { toBlob } from 'html-to-image';
 import { DHIKR_LIST as INITIAL_DHIKR_LIST, Dhikr } from './constants';
 import MorningEveningView from './components/MorningEveningView';
 import HisnMuslimView from './components/HisnMuslimView';
+import DuasView from './components/DuasView';
 import {
   BarChart,
   Bar,
@@ -122,7 +124,7 @@ const getDefaultTimerForDhikr = (dhikr: Dhikr | null | undefined): number => {
 };
 
 export default function App() {
-  const [view, setView] = useState<'main' | 'stats' | 'manage' | 'morning_evening' | 'hisn_muslim'>('main');
+  const [view, setView] = useState<'main' | 'stats' | 'manage' | 'morning_evening' | 'hisn_muslim' | 'duas'>('main');
   const [currentIndex, setCurrentIndex] = useState(0);
   const [mode, setMode] = useState<'counter' | 'timer'>('counter');
   
@@ -278,7 +280,7 @@ export default function App() {
     };
   }, []);
 
-  const changeView = (newView: 'main' | 'stats' | 'manage' | 'morning_evening' | 'hisn_muslim') => {
+  const changeView = (newView: 'main' | 'stats' | 'manage' | 'morning_evening' | 'hisn_muslim' | 'duas') => {
     if (newView === view) return;
     
     if (view === 'main') {
@@ -899,6 +901,16 @@ export default function App() {
     return (
       <>
         <HisnMuslimView onClose={() => changeView('main')} />
+        <BottomNav currentView={view} onChangeView={changeView} />
+      </>
+    );
+  }
+
+  // --- Render Duas View ---
+  if (view === 'duas') {
+    return (
+      <>
+        <DuasView onBack={() => changeView('main')} />
         <BottomNav currentView={view} onChangeView={changeView} />
       </>
     );
@@ -1947,6 +1959,9 @@ function BottomNav({ currentView, onChangeView }: { currentView: string, onChang
         </button>
         <button onClick={() => onChangeView('morning_evening')} className={`flex items-center justify-center p-3 rounded-2xl transition-all ${currentView === 'morning_evening' ? 'text-accent bg-primary/10 scale-110' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`}>
           <Sun size={24} />
+        </button>
+        <button onClick={() => onChangeView('duas')} className={`flex items-center justify-center p-3 rounded-2xl transition-all ${currentView === 'duas' ? 'text-accent bg-primary/10 scale-110' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`}>
+          <Heart size={24} />
         </button>
         <button onClick={() => onChangeView('hisn_muslim')} className={`flex items-center justify-center p-3 rounded-2xl transition-all ${currentView === 'hisn_muslim' ? 'text-accent bg-primary/10 scale-110' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`}>
           <BookOpen size={24} />
