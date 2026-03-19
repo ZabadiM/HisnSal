@@ -161,7 +161,7 @@ export default function App() {
   const [shareImageBlob, setShareImageBlob] = useState<Blob | null>(null);
   const [showGeneratedImage, setShowGeneratedImage] = useState(false);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const shareRef = useRef<HTMLDivElement>(null);
+  const hiddenShareRef = useRef<HTMLDivElement>(null);
   const [showList, setShowList] = useState(false);
   const listScrollPositionRef = useRef(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -721,50 +721,33 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (showShareMenu && shareRef.current && currentDhikr) {
+    if (showShareMenu && hiddenShareRef.current && currentDhikr) {
       const generateImage = async () => {
         setIsGeneratingImage(true);
         try {
           console.log('Generating image...');
-          const watermark = shareRef.current?.querySelector('#watermark');
-          const shareDetails = shareRef.current?.querySelector('#share-details');
-          if (watermark) watermark.classList.remove('hidden');
-          if (shareDetails) shareDetails.classList.remove('hidden');
-
-          // Temporarily fix width to ensure a good aspect ratio for sharing
-          const originalWidth = shareRef.current.style.width;
-          const originalMaxWidth = shareRef.current.style.maxWidth;
-          const originalPadding = shareRef.current.style.padding;
           
-          shareRef.current.style.width = '600px';
-          shareRef.current.style.maxWidth = 'none';
-          shareRef.current.style.padding = '40px';
-
           // Small delay to ensure layout is updated
-          await new Promise(resolve => setTimeout(resolve, 50));
+          await new Promise(resolve => setTimeout(resolve, 100));
 
-          const blob = await toBlob(shareRef.current!, {
-            backgroundColor: document.documentElement.classList.contains('dark') ? '#121212' : '#f5f5f0',
+          const blob = await toBlob(hiddenShareRef.current!, {
+            backgroundColor: isDarkMode ? '#121410' : '#F9F8F4',
+            width: 600,
             pixelRatio: 2,
-            filter: (node) => {
-              // Filter out elements with data-html2canvas-ignore
-              if (node instanceof HTMLElement && node.dataset.html2canvasIgnore !== undefined) {
-                return false;
-              }
-              return true;
+            skipFonts: true,
+            fontEmbedCSS: '', 
+            style: {
+              fontFamily: 'Amiri, serif',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              visibility: 'visible',
             }
           });
           
           console.log('Image generated successfully', blob);
-          
-          // Restore original styles
-          shareRef.current.style.width = originalWidth;
-          shareRef.current.style.maxWidth = originalMaxWidth;
-          shareRef.current.style.padding = originalPadding;
-
-          if (watermark) watermark.classList.add('hidden');
-          if (shareDetails) shareDetails.classList.add('hidden');
-
           setShareImageBlob(blob);
         } catch (error) {
           console.error('Error generating image:', error);
@@ -778,7 +761,7 @@ export default function App() {
     } else if (!showShareMenu) {
       setShareImageBlob(null);
     }
-  }, [showShareMenu, currentDhikr]);
+  }, [showShareMenu, currentDhikr, isDarkMode]);
 
   // Timer logic - ONLY counts time when timer is running
   useEffect(() => {
@@ -1155,7 +1138,6 @@ export default function App() {
                     exit={{ opacity: 0, y: -15, scale: 0.98 }}
                     transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
                     className="space-y-4 py-4"
-                    ref={shareRef}
                   >
                     <h2 
                       className="font-serif arabic-text leading-relaxed transition-all duration-300 text-primary"
@@ -1163,23 +1145,6 @@ export default function App() {
                     >
                       {currentDhikr.text}
                     </h2>
-                    <div id="share-details" className="hidden mt-6 text-right space-y-4 border-t border-primary/10 pt-4">
-                      {currentDhikr.virtue && (
-                        <div>
-                          <h4 className="text-sm font-bold text-primary/80 mb-1">الفضل:</h4>
-                          <p className="text-sm text-primary/70">{currentDhikr.virtue}</p>
-                        </div>
-                      )}
-                      {currentDhikr.hadith && (
-                        <div>
-                          <h4 className="text-sm font-bold text-primary/80 mb-1">الحديث:</h4>
-                          <p className="text-sm text-primary/70">{currentDhikr.hadith}</p>
-                        </div>
-                      )}
-                    </div>
-                    <div id="watermark" className="hidden mt-6 pt-4 border-t border-primary/10">
-                      <p className="text-sm font-medium text-primary/60">تمت المشاركة عن طريق تطبيق AzkarSal</p>
-                    </div>
                     <div className="flex items-center justify-center gap-4 mt-2 pt-2 border-t border-primary/5" data-html2canvas-ignore>
                       <button 
                         onClick={() => toggleFavorite(currentDhikr.id)}
@@ -1869,6 +1834,49 @@ export default function App() {
         )}
       </main>
       <BottomNav currentView={view} onChangeView={changeView} />
+
+      {/* Hidden Shareable Card - Dedicated for image sharing */}
+      <div 
+        ref={hiddenShareRef}
+        className="fixed -left-[2000px] top-0 w-[600px] p-16 flex flex-col items-center text-center"
+        style={{ 
+          backgroundColor: isDarkMode ? '#121410' : '#F9F8F4',
+          color: isDarkMode ? '#EAE6D7' : '#4A5D23',
+          fontFamily: 'Amiri, serif',
+          minHeight: '400px',
+          direction: 'rtl'
+        }}
+      >
+        <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-8" style={{ backgroundColor: isDarkMode ? 'rgba(234, 230, 215, 0.1)' : 'rgba(74, 93, 35, 0.1)' }}>
+          <Star size={40} style={{ color: isDarkMode ? '#D4A373' : '#4A5D23' }} fill="currentColor" />
+        </div>
+        
+        <h2 className="arabic-text leading-relaxed text-4xl mb-8" style={{ color: isDarkMode ? '#EAE6D7' : '#4A5D23' }}>
+          {currentDhikr?.text}
+        </h2>
+        
+        {(currentDhikr?.virtue || currentDhikr?.hadith) && (
+          <div className="w-full space-y-6 pt-8 text-right" style={{ borderTop: `1px solid ${isDarkMode ? 'rgba(234, 230, 215, 0.1)' : 'rgba(74, 93, 35, 0.1)'}` }}>
+            {currentDhikr.virtue && (
+              <div className="space-y-2">
+                <h4 className="text-xl font-bold" style={{ color: isDarkMode ? '#D4A373' : '#4A5D23' }}>الفضل:</h4>
+                <p className="text-lg leading-relaxed" style={{ color: isDarkMode ? 'rgba(234, 230, 215, 0.8)' : 'rgba(74, 93, 35, 0.8)' }}>{currentDhikr.virtue}</p>
+              </div>
+            )}
+            {currentDhikr.hadith && (
+              <div className="space-y-2">
+                <h4 className="text-xl font-bold" style={{ color: isDarkMode ? '#D4A373' : '#4A5D23' }}>الحديث:</h4>
+                <p className="text-lg italic leading-relaxed" style={{ color: isDarkMode ? 'rgba(234, 230, 215, 0.7)' : 'rgba(74, 93, 35, 0.7)' }}>{currentDhikr.hadith}</p>
+              </div>
+            )}
+          </div>
+        )}
+        
+        <div className="w-full mt-auto pt-12 flex flex-col items-center gap-2" style={{ borderTop: `1px solid ${isDarkMode ? 'rgba(234, 230, 215, 0.1)' : 'rgba(74, 93, 35, 0.1)'}` }}>
+          <p className="text-sm font-bold tracking-widest uppercase opacity-40">AzkarSal App</p>
+          <p className="text-xs opacity-30">تطبيق أذكار المسلم</p>
+        </div>
+      </div>
     </div>
   );
 }
