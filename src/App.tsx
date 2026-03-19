@@ -39,6 +39,7 @@ import {
   Download,
   Upload
 } from 'lucide-react';
+import html2canvas from 'html2canvas';
 import { toBlob } from 'html-to-image';
 import { DHIKR_LIST as INITIAL_DHIKR_LIST, Dhikr } from './constants';
 import MorningEveningView from './components/MorningEveningView';
@@ -725,34 +726,64 @@ export default function App() {
       const generateImage = async () => {
         setIsGeneratingImage(true);
         try {
-          console.log('Generating image...');
+          console.log('Generating image with html-to-image...');
           
           // Small delay to ensure layout is updated
-          await new Promise(resolve => setTimeout(resolve, 100));
+          await new Promise(resolve => setTimeout(resolve, 300));
 
           const blob = await toBlob(hiddenShareRef.current!, {
             backgroundColor: isDarkMode ? '#121410' : '#F9F8F4',
             width: 600,
             pixelRatio: 2,
-            skipFonts: true,
-            fontEmbedCSS: '', 
+            skipFonts: false,
             style: {
-              fontFamily: 'Amiri, serif',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              textAlign: 'center',
               visibility: 'visible',
+              opacity: '1',
+              transform: 'none'
             }
           });
           
-          console.log('Image generated successfully', blob);
-          setShareImageBlob(blob);
+          if (blob) {
+            console.log('Image generated successfully', blob);
+            setShareImageBlob(blob);
+          } else {
+            throw new Error('toBlob returned null');
+          }
+          
         } catch (error) {
           console.error('Error generating image:', error);
-          alert('حدث خطأ أثناء تجهيز الصورة: ' + error);
-          setShareImageBlob(null);
+          // Fallback to html2canvas if html-to-image fails
+          try {
+            console.log('Generating image with html2canvas fallback...');
+            const canvas = await html2canvas(hiddenShareRef.current!, {
+              backgroundColor: isDarkMode ? '#121410' : '#F9F8F4',
+              scale: 2,
+              useCORS: true,
+              allowTaint: true,
+              logging: false,
+              width: 600,
+              onclone: (clonedDoc) => {
+                const element = clonedDoc.getElementById('hidden-share-card');
+                if (element) {
+                  element.style.visibility = 'visible';
+                  element.style.opacity = '1';
+                  element.style.zIndex = '9999';
+                  element.style.transform = 'none';
+                }
+              }
+            });
+            
+            const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+            
+            if (blob) {
+              setShareImageBlob(blob);
+            } else {
+              throw new Error('Canvas toBlob returned null');
+            }
+          } catch (fallbackError) {
+            console.error('Fallback image generation failed:', fallbackError);
+            alert('حدث خطأ أثناء تجهيز الصورة');
+          }
         } finally {
           setIsGeneratingImage(false);
         }
@@ -1838,13 +1869,15 @@ export default function App() {
       {/* Hidden Shareable Card - Dedicated for image sharing */}
       <div 
         ref={hiddenShareRef}
-        className="fixed -left-[2000px] top-0 w-[600px] p-16 flex flex-col items-center text-center"
+        id="hidden-share-card"
+        className="absolute -left-[9999px] top-0 w-[600px] p-16 flex flex-col items-center text-center pointer-events-none"
         style={{ 
           backgroundColor: isDarkMode ? '#121410' : '#F9F8F4',
           color: isDarkMode ? '#EAE6D7' : '#4A5D23',
-          fontFamily: 'Amiri, serif',
+          fontFamily: "'Amiri', serif",
           minHeight: '400px',
-          direction: 'rtl'
+          direction: 'rtl',
+          zIndex: -1000
         }}
       >
         <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-8" style={{ backgroundColor: isDarkMode ? 'rgba(234, 230, 215, 0.1)' : 'rgba(74, 93, 35, 0.1)' }}>
