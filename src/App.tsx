@@ -262,6 +262,7 @@ export default function App() {
         setShowResetMenu(state.modal === 'resetMenu');
         setShowGeneratedImage(state.modal === 'generatedImage');
       } else {
+        // If no state, we might have gone back too far, try to recover
         setView('main');
         setShowList(false);
         setShowVirtue(false);
@@ -283,15 +284,9 @@ export default function App() {
   const changeView = (newView: 'main' | 'stats' | 'manage' | 'morning_evening' | 'hisn_muslim' | 'duas') => {
     if (newView === view) return;
     
-    if (view === 'main') {
-      window.history.pushState({ view: newView, modal: null }, '');
-      setView(newView);
-    } else if (newView === 'main') {
-      window.history.back();
-    } else {
-      window.history.replaceState({ view: newView, modal: null }, '');
-      setView(newView);
-    }
+    // Always push state when changing views
+    setView(newView);
+    window.history.pushState({ view: newView, modal: null }, '');
   };
 
   const openModal = (modalName: 'list' | 'virtue' | 'share' | 'sound' | 'autoAdvance' | 'resetMenu' | 'generatedImage') => {
@@ -318,7 +313,18 @@ export default function App() {
 
   const closeOverlay = () => {
     // We just go back in history, which will trigger popstate and close the modal
-    window.history.back();
+    if (window.history.state?.modal) {
+      window.history.back();
+    } else {
+      // Fallback if state is messed up
+      setShowList(false);
+      setShowVirtue(false);
+      setShowShareMenu(false);
+      setShowSoundSettings(false);
+      setShowAutoAdvanceSettings(false);
+      setShowResetMenu(false);
+      setShowGeneratedImage(false);
+    }
   };
   
   // Persistent Stats
@@ -1360,14 +1366,14 @@ export default function App() {
               <Menu size={20} />
             </button>
             <button 
-              onClick={() => setView('stats')}
+              onClick={() => changeView('stats')}
               className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-primary/10 transition-colors"
               title="الإحصائيات"
             >
               <BarChart3 size={20} />
             </button>
             <button 
-              onClick={() => setView('manage')}
+              onClick={() => changeView('manage')}
               className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-primary/10 transition-colors"
               title="إدارة الأذكار"
             >
