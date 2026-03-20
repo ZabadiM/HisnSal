@@ -164,15 +164,24 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
   });
   const [quranDuas, setQuranDuas] = useState<any[]>(() => {
     const saved = localStorage.getItem('quran_duas_order');
-    return saved ? JSON.parse(saved) : QURAN_DUAS;
+    if (!saved) return QURAN_DUAS;
+    const savedList = JSON.parse(saved);
+    const newItems = QURAN_DUAS.filter(item => !savedList.some((s: any) => s.id === item.id));
+    return [...savedList, ...newItems];
   });
   const [sunnahDuas, setSunnahDuas] = useState<any[]>(() => {
     const saved = localStorage.getItem('sunnah_duas_order');
-    return saved ? JSON.parse(saved) : SUNNAH_DUAS;
+    if (!saved) return SUNNAH_DUAS;
+    const savedList = JSON.parse(saved);
+    const newItems = SUNNAH_DUAS.filter(item => !savedList.some((s: any) => s.id === item.id));
+    return [...savedList, ...newItems];
   });
   const [khatmDuas, setKhatmDuas] = useState<any[]>(() => {
     const saved = localStorage.getItem('khatm_duas_order');
-    return saved ? JSON.parse(saved) : KHATM_QURAN_DUA;
+    if (!saved) return KHATM_QURAN_DUA;
+    const savedList = JSON.parse(saved);
+    const newItems = KHATM_QURAN_DUA.filter(item => !savedList.some((s: any) => s.id === item.id));
+    return [...savedList, ...newItems];
   });
   const [customDuas, setCustomDuas] = useState<CustomDua[]>(() => {
     const saved = localStorage.getItem('custom_duas');
