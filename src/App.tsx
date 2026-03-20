@@ -42,6 +42,7 @@ import {
 } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { toBlob } from 'html-to-image';
+import * as XLSX from 'xlsx';
 import { DHIKR_LIST as INITIAL_DHIKR_LIST, Dhikr } from './constants';
 import MorningEveningView from './components/MorningEveningView';
 import HisnMuslimView from './components/HisnMuslimView';
@@ -2053,12 +2054,31 @@ function ManageDhikrView({
   };
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(dhikrList, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
+    // Map dhikrList to use Arabic headers for the Excel file
+    const exportData = dhikrList.map(d => ({
+      'المعرف': d.id,
+      'الذكر': d.text,
+      'الترجمة_الصوتية': d.transliteration || '',
+      'الفضل': d.virtue || '',
+      'الحديث': d.hadith || '',
+      'الهدف': d.target || 100,
+      'الخطوة': d.step || 100,
+      'مفضل': d.isFavorite ? 'نعم' : 'لا',
+      'المؤقت_الافتراضي': d.defaultTimer || 60
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "الأذكار");
+    
+    // Generate buffer
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    
     const url = URL.createObjectURL(blob);
     const linkElement = document.createElement('a');
     linkElement.href = url;
-    linkElement.download = 'dhikr_list.json';
+    linkElement.download = 'dhikr_list.xlsx';
     document.body.appendChild(linkElement);
     linkElement.click();
     document.body.removeChild(linkElement);
@@ -2071,20 +2091,45 @@ function ManageDhikrView({
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
-          const importedList = JSON.parse(e.target?.result as string);
-          if (Array.isArray(importedList)) {
-            setDhikrList(importedList);
-            alert('تم استيراد الأذكار بنجاح!');
+          const data = new Uint8Array(e.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const importedData = XLSX.utils.sheet_to_json(worksheet) as any[];
+          
+          if (Array.isArray(importedData) && importedData.length > 0) {
+            // Map Arabic headers back to Dhikr interface properties
+            const importedList: Dhikr[] = importedData.map((row, index) => ({
+              id: row['المعرف'] || `custom_${Date.now()}_${index}`,
+              text: row['الذكر'] || '',
+              transliteration: row['الترجمة_الصوتية'] || '',
+              virtue: row['الفضل'] || '',
+              hadith: row['الحديث'] || '',
+              target: Number(row['الهدف']) || 100,
+              step: Number(row['الخطوة']) || 100,
+              isFavorite: row['مفضل'] === 'نعم',
+              defaultTimer: Number(row['المؤقت_الافتراضي']) || 60
+            }));
+
+            // Basic validation: check if first item has 'text' property
+            if (importedList[0].text) {
+              setDhikrList(importedList);
+              alert('تم استيراد الأذكار بنجاح!');
+            } else {
+              alert('تنسيق الملف غير صحيح. تأكد من وجود عمود باسم "الذكر"');
+            }
           } else {
-            alert('ملف غير صالح');
+            alert('ملف فارغ أو غير صالح');
           }
         } catch (error) {
           console.error('Error reading file', error);
-          alert('حدث خطأ أثناء قراءة الملف');
+          alert('حدث خطأ أثناء قراءة الملف. تأكد أنه ملف إكسل صالح.');
         }
       };
-      reader.readAsText(file);
+      reader.readAsArrayBuffer(file);
     }
+    // Reset input value so the same file can be imported again
+    event.target.value = '';
   };
 
   return (
@@ -2097,7 +2142,7 @@ function ManageDhikrView({
         <h1 className="text-2xl font-bold font-serif">إدارة الأذكار</h1>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1 p-2 rounded-xl hover:bg-primary/10 transition-colors cursor-pointer text-sm font-medium" title="استيراد">
-            <input type="file" accept=".json" className="hidden" onChange={handleImport} />
+            <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleImport} />
             <Download size={18} />
             <span>استيراد</span>
           </label>
