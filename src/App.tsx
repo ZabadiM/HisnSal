@@ -34,14 +34,11 @@ import {
   ArrowDown,
   Star,
   Share2,
-  ImageIcon,
   Search,
   FastForward,
   Download,
   Upload
 } from 'lucide-react';
-import html2canvas from 'html2canvas';
-import { toBlob } from 'html-to-image';
 import * as XLSX from 'xlsx';
 import { DHIKR_LIST as INITIAL_DHIKR_LIST, Dhikr } from './constants';
 import MorningEveningView from './components/MorningEveningView';
@@ -162,10 +159,6 @@ export default function App() {
   const [showSoundSettings, setShowSoundSettings] = useState(false);
   const [showAutoAdvanceSettings, setShowAutoAdvanceSettings] = useState(false);
   const [showResetMenu, setShowResetMenu] = useState(false);
-  const [shareImageBlob, setShareImageBlob] = useState<Blob | null>(null);
-  const [showGeneratedImage, setShowGeneratedImage] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
-  const hiddenShareRef = useRef<HTMLDivElement>(null);
   const [showList, setShowList] = useState(false);
   const listScrollPositionRef = useRef(0);
   const listRef = useRef<HTMLDivElement>(null);
@@ -261,7 +254,6 @@ export default function App() {
         setShowSoundSettings(state.modal === 'sound');
         setShowAutoAdvanceSettings(state.modal === 'autoAdvance');
         setShowResetMenu(state.modal === 'resetMenu');
-        setShowGeneratedImage(state.modal === 'generatedImage');
       } else {
         // If no state, we might have gone back too far, try to recover
         setView('main');
@@ -271,7 +263,6 @@ export default function App() {
         setShowSoundSettings(false);
         setShowAutoAdvanceSettings(false);
         setShowResetMenu(false);
-        setShowGeneratedImage(false);
       }
     };
     
@@ -290,7 +281,7 @@ export default function App() {
     window.history.pushState({ view: newView, modal: null }, '', '#' + newView);
   };
 
-  const openModal = (modalName: 'list' | 'virtue' | 'share' | 'sound' | 'autoAdvance' | 'resetMenu' | 'generatedImage') => {
+  const openModal = (modalName: 'list' | 'virtue' | 'share' | 'sound' | 'autoAdvance' | 'resetMenu') => {
     window.history.pushState({ view: view, modal: modalName }, '', '#' + view + '-' + modalName);
     if (modalName === 'list') setShowList(true);
     if (modalName === 'virtue') setShowVirtue(true);
@@ -298,7 +289,6 @@ export default function App() {
     if (modalName === 'sound') setShowSoundSettings(true);
     if (modalName === 'autoAdvance') setShowAutoAdvanceSettings(true);
     if (modalName === 'resetMenu') setShowResetMenu(true);
-    if (modalName === 'generatedImage') setShowGeneratedImage(true);
   };
 
   useEffect(() => {
@@ -324,7 +314,6 @@ export default function App() {
       setShowSoundSettings(false);
       setShowAutoAdvanceSettings(false);
       setShowResetMenu(false);
-      setShowGeneratedImage(false);
     }
   };
   
@@ -688,120 +677,6 @@ export default function App() {
     }
     closeOverlay();
   };
-
-  const handleShareImage = async () => {
-    if (!shareImageBlob) {
-      if (isGeneratingImage) {
-        alert('جاري تجهيز الصورة، يرجى الانتظار قليلاً...');
-      } else {
-        alert('عذراً، حدث خطأ أثناء تجهيز الصورة');
-      }
-      return;
-    }
-
-    const file = new File([shareImageBlob], 'dhikr.png', { type: 'image/png' });
-
-    let shared = false;
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          title: 'ذكر من تطبيق AzkarSal',
-          files: [file],
-        });
-        shared = true;
-      } catch (error) {
-        if (error instanceof Error && error.name === 'AbortError') {
-          closeOverlay();
-          return;
-        }
-        console.error('Share API failed:', error);
-      }
-    }
-    
-    if (!shared) {
-      // Close share menu first
-      closeOverlay();
-      // Wait a bit for the history state to settle before opening the new modal
-      setTimeout(() => {
-        openModal('generatedImage');
-      }, 50);
-    } else {
-      closeOverlay();
-    }
-  };
-
-  useEffect(() => {
-    if (showShareMenu && hiddenShareRef.current && currentDhikr) {
-      const generateImage = async () => {
-        setIsGeneratingImage(true);
-        try {
-          console.log('Generating image with html-to-image...');
-          
-          // Small delay to ensure layout is updated
-          await new Promise(resolve => setTimeout(resolve, 300));
-
-          const blob = await toBlob(hiddenShareRef.current!, {
-            backgroundColor: isDarkMode ? '#121410' : '#F9F8F4',
-            width: 600,
-            pixelRatio: 2,
-            skipFonts: false,
-            style: {
-              visibility: 'visible',
-              opacity: '1',
-              transform: 'none'
-            }
-          });
-          
-          if (blob) {
-            console.log('Image generated successfully', blob);
-            setShareImageBlob(blob);
-          } else {
-            throw new Error('toBlob returned null');
-          }
-          
-        } catch (error) {
-          console.error('Error generating image:', error);
-          // Fallback to html2canvas if html-to-image fails
-          try {
-            console.log('Generating image with html2canvas fallback...');
-            const canvas = await html2canvas(hiddenShareRef.current!, {
-              backgroundColor: isDarkMode ? '#121410' : '#F9F8F4',
-              scale: 2,
-              useCORS: true,
-              allowTaint: true,
-              logging: false,
-              width: 600,
-              onclone: (clonedDoc) => {
-                const element = clonedDoc.getElementById('hidden-share-card');
-                if (element) {
-                  element.style.visibility = 'visible';
-                  element.style.opacity = '1';
-                  element.style.zIndex = '9999';
-                  element.style.transform = 'none';
-                }
-              }
-            });
-            
-            const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
-            
-            if (blob) {
-              setShareImageBlob(blob);
-            } else {
-              throw new Error('Canvas toBlob returned null');
-            }
-          } catch (fallbackError) {
-            console.error('Fallback image generation failed:', fallbackError);
-            alert('حدث خطأ أثناء تجهيز الصورة');
-          }
-        } finally {
-          setIsGeneratingImage(false);
-        }
-      };
-      generateImage();
-    } else if (!showShareMenu) {
-      setShareImageBlob(null);
-    }
-  }, [showShareMenu, currentDhikr, isDarkMode]);
 
   // Timer logic - ONLY counts time when timer is running
   useEffect(() => {
@@ -1592,17 +1467,10 @@ export default function App() {
                     <div className="flex flex-col gap-3">
                       <button 
                         onClick={handleShareText}
-                        className="flex items-center justify-center gap-2 w-full py-3.5 bg-primary/10 hover:bg-primary/20 text-primary rounded-xl transition-colors font-medium"
+                        className="flex items-center justify-center gap-2 w-full py-3.5 bg-primary text-secondary hover:bg-primary/90 rounded-xl transition-colors font-medium shadow-md"
                       >
                         <Share2 size={18} />
                         مشاركة كنص
-                      </button>
-                      <button 
-                        onClick={handleShareImage}
-                        className="flex items-center justify-center gap-2 w-full py-3.5 bg-primary text-secondary hover:bg-primary/90 rounded-xl transition-colors font-medium shadow-md"
-                      >
-                        <ImageIcon size={18} />
-                        مشاركة كصورة
                       </button>
                     </div>
                     <button 
@@ -1610,62 +1478,6 @@ export default function App() {
                       className="mt-4 text-sm font-medium text-primary/60 hover:text-primary transition-colors px-4 py-2 rounded-lg hover:bg-primary/5"
                     >
                       إلغاء
-                    </button>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* Generated Image Modal */}
-            <AnimatePresence>
-              {showGeneratedImage && shareImageBlob && (
-                <motion.div 
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 z-[60] flex items-center justify-center p-6 bg-black/80 backdrop-blur-md"
-                  onClick={closeOverlay}
-                >
-                  <motion.div 
-                    initial={{ scale: 0.9, y: 20 }}
-                    animate={{ scale: 1, y: 0 }}
-                    exit={{ scale: 0.9, y: 20 }}
-                    transition={{ type: "spring", damping: 25, stiffness: 300 }}
-                    className="bg-secondary rounded-3xl p-4 max-w-sm w-full shadow-2xl space-y-4 text-center relative max-h-[90vh] flex flex-col"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <button 
-                      onClick={closeOverlay}
-                      className="absolute top-2 right-2 p-2 bg-primary/10 text-primary rounded-full hover:bg-primary/20 transition-colors z-10"
-                    >
-                      <X size={20} />
-                    </button>
-                    <h3 className="text-lg font-bold font-serif mb-2 text-primary">الصورة جاهزة</h3>
-                    <p className="text-sm text-primary/70 mb-4">اضغط مطولاً على الصورة لحفظها أو مشاركتها</p>
-                    <div className="flex-1 overflow-y-auto rounded-xl border border-primary/10 bg-primary/5 p-2 scrollbar-hide">
-                      <img 
-                        src={URL.createObjectURL(shareImageBlob)} 
-                        alt="ذكر" 
-                        className="w-full h-auto rounded-lg shadow-sm" 
-                        onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
-                      />
-                    </div>
-                    <button 
-                      onClick={() => {
-                        const url = URL.createObjectURL(shareImageBlob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'dhikr.png';
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
-                        URL.revokeObjectURL(url);
-                        closeOverlay();
-                      }}
-                      className="w-full py-3 bg-primary text-secondary rounded-xl font-bold shadow-md hover:bg-primary/90 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <Share2 size={18} />
-                      تنزيل الصورة
                     </button>
                   </motion.div>
                 </motion.div>
@@ -1873,51 +1685,6 @@ export default function App() {
               )}
             </AnimatePresence>
 
-
-      {/* Hidden Shareable Card - Dedicated for image sharing */}
-      <div 
-        ref={hiddenShareRef}
-        id="hidden-share-card"
-        className="absolute -left-[9999px] top-0 w-[600px] p-16 flex flex-col items-center text-center pointer-events-none"
-        style={{ 
-          backgroundColor: isDarkMode ? '#121410' : '#F9F8F4',
-          color: isDarkMode ? '#EAE6D7' : '#4A5D23',
-          fontFamily: "'Amiri', serif",
-          minHeight: '400px',
-          direction: 'rtl',
-          zIndex: -1000
-        }}
-      >
-        <div className="w-20 h-20 rounded-3xl flex items-center justify-center mb-8" style={{ backgroundColor: isDarkMode ? 'rgba(234, 230, 215, 0.1)' : 'rgba(74, 93, 35, 0.1)' }}>
-          <Star size={40} style={{ color: isDarkMode ? '#D4A373' : '#4A5D23' }} fill="currentColor" />
-        </div>
-        
-        <h2 className="arabic-text leading-relaxed text-4xl mb-8" style={{ color: isDarkMode ? '#EAE6D7' : '#4A5D23' }}>
-          {currentDhikr?.text}
-        </h2>
-        
-        {(currentDhikr?.virtue || currentDhikr?.hadith) && (
-          <div className="w-full space-y-6 pt-8 text-right" style={{ borderTop: `1px solid ${isDarkMode ? 'rgba(234, 230, 215, 0.1)' : 'rgba(74, 93, 35, 0.1)'}` }}>
-            {currentDhikr.virtue && (
-              <div className="space-y-2">
-                <h4 className="text-xl font-bold" style={{ color: isDarkMode ? '#D4A373' : '#4A5D23' }}>الفضل:</h4>
-                <p className="text-lg leading-relaxed" style={{ color: isDarkMode ? 'rgba(234, 230, 215, 0.8)' : 'rgba(74, 93, 35, 0.8)' }}>{currentDhikr.virtue}</p>
-              </div>
-            )}
-            {currentDhikr.hadith && (
-              <div className="space-y-2">
-                <h4 className="text-xl font-bold" style={{ color: isDarkMode ? '#D4A373' : '#4A5D23' }}>الحديث:</h4>
-                <p className="text-lg italic leading-relaxed" style={{ color: isDarkMode ? 'rgba(234, 230, 215, 0.7)' : 'rgba(74, 93, 35, 0.7)' }}>{currentDhikr.hadith}</p>
-              </div>
-            )}
-          </div>
-        )}
-        
-        <div className="w-full mt-auto pt-12 flex flex-col items-center gap-2" style={{ borderTop: `1px solid ${isDarkMode ? 'rgba(234, 230, 215, 0.1)' : 'rgba(74, 93, 35, 0.1)'}` }}>
-          <p className="text-sm font-bold tracking-widest uppercase opacity-40">AzkarSal App</p>
-          <p className="text-xs opacity-30">تطبيق أذكار المسلم</p>
-        </div>
-      </div>
     </div>
   );
 }
@@ -2058,13 +1825,12 @@ function ManageDhikrView({
     const exportData = dhikrList.map(d => ({
       'المعرف': d.id,
       'الذكر': d.text,
-      'الترجمة_الصوتية': d.transliteration || '',
       'الفضل': d.virtue || '',
       'الحديث': d.hadith || '',
       'الهدف': d.target || 100,
       'الخطوة': d.step || 100,
       'مفضل': d.isFavorite ? 'نعم' : 'لا',
-      'المؤقت_الافتراضي': d.defaultTimer || 60
+      'المؤقت_الافتراضي_بالدقائق': Math.round((d.defaultTimer || 60) / 60)
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -2102,13 +1868,12 @@ function ManageDhikrView({
             const importedList: Dhikr[] = importedData.map((row, index) => ({
               id: row['المعرف'] || `custom_${Date.now()}_${index}`,
               text: row['الذكر'] || '',
-              transliteration: row['الترجمة_الصوتية'] || '',
               virtue: row['الفضل'] || '',
               hadith: row['الحديث'] || '',
               target: Number(row['الهدف']) || 100,
               step: Number(row['الخطوة']) || 100,
               isFavorite: row['مفضل'] === 'نعم',
-              defaultTimer: Number(row['المؤقت_الافتراضي']) || 60
+              defaultTimer: (Number(row['المؤقت_الافتراضي_بالدقائق']) || 1) * 60
             }));
 
             // Basic validation: check if first item has 'text' property
