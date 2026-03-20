@@ -193,6 +193,8 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
   const [newDuaVirtue, setNewDuaVirtue] = useState('');
   const [newDuaHadith, setNewDuaHadith] = useState('');
   const [isEditing, setIsEditing] = useState<string | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [duaToDelete, setDuaToDelete] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
   const [showVirtue, setShowVirtue] = useState(false);
   const [showListModal, setShowListModal] = useState(false);
@@ -211,6 +213,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
       if (state && state.view === 'duas') {
         setShowListModal(state.modal === 'duasList');
         setShowAddModal(state.modal === 'duasAdd');
+        setShowDeleteConfirm(state.modal === 'duasDelete');
       }
     };
     window.addEventListener('popstate', handlePopState);
@@ -241,6 +244,21 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
       window.history.back();
     } else {
       setShowAddModal(false);
+    }
+  };
+
+  const openDeleteConfirm = (id: string) => {
+    window.history.pushState({ view: 'duas', modal: 'duasDelete' }, '', '#duas-delete');
+    setDuaToDelete(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const closeDeleteConfirm = () => {
+    if (window.history.state?.modal === 'duasDelete') {
+      window.history.back();
+    } else {
+      setShowDeleteConfirm(false);
+      setDuaToDelete(null);
     }
   };
 
@@ -366,10 +384,16 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
 
   const handleDeleteCustomDua = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setCustomDuas(prev => prev.filter(d => d.id !== id));
+    openDeleteConfirm(id);
+  };
+
+  const confirmDelete = () => {
+    if (!duaToDelete) return;
+    setCustomDuas(prev => prev.filter(d => d.id !== duaToDelete));
     if (currentIndex >= customDuas.length - 1) {
       setCategoryIndices(prev => ({ ...prev, custom: Math.max(0, customDuas.length - 2) }));
     }
+    closeDeleteConfirm();
   };
 
   const handleEditCustomDua = (dua: CustomDua, e: React.MouseEvent) => {
@@ -862,6 +886,48 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
                   className="w-full py-4 rounded-2xl bg-accent text-white font-bold text-lg hover:bg-accent/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isEditing ? 'حفظ التعديلات' : 'إضافة الدعاء'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+            onClick={closeDeleteConfirm}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-surface w-full max-w-xs rounded-3xl shadow-2xl p-6 flex flex-col items-center text-center gap-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
+                <Trash2 size={32} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-primary mb-2">تأكيد الحذف</h3>
+                <p className="text-sm text-primary/60">هل أنت متأكد من رغبتك في حذف هذا الدعاء؟ لا يمكن التراجع عن هذا الإجراء.</p>
+              </div>
+              <div className="flex w-full gap-3">
+                <button
+                  onClick={closeDeleteConfirm}
+                  className="flex-1 py-3 rounded-2xl bg-secondary text-primary font-bold hover:bg-primary/5 transition-colors"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-bold hover:bg-red-600 transition-colors"
+                >
+                  حذف
                 </button>
               </div>
             </motion.div>
