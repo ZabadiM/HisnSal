@@ -1,7 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Book, Hand, ScrollText, ChevronLeft, ChevronRight, Info, Star, List, X, Plus, Minus, Heart, Edit2, Trash2, GripVertical } from 'lucide-react';
+import { Book, Hand, ScrollText, ChevronLeft, ChevronRight, Info, Star, List, X, Plus, Minus, Heart, Edit2, Trash2, GripVertical, Quote, ArrowUp, ArrowDown, Share2 } from 'lucide-react';
 import { QURAN_DUAS, SUNNAH_DUAS, KHATM_QURAN_DUA } from '../data/duas';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 type DuaCategory = 'quran' | 'sunnah' | 'khatm' | 'custom';
 
@@ -17,6 +34,125 @@ interface CustomDua {
   hadith?: string;
 }
 
+interface SortableDuaItemProps {
+  dua: any;
+  index: number;
+  currentIndex: number;
+  isReordering: boolean;
+  isFavorite: boolean;
+  isCustom: boolean;
+  onSelect: () => void;
+  onEdit: (e: React.MouseEvent) => void;
+  onDelete: (e: React.MouseEvent) => void;
+  onMove: (direction: 'up' | 'down', e: React.MouseEvent) => void;
+  totalCount: number;
+}
+
+const SortableDuaItem: React.FC<SortableDuaItemProps> = ({
+  dua,
+  index,
+  currentIndex,
+  isReordering,
+  isFavorite,
+  isCustom,
+  onSelect,
+  onEdit,
+  onDelete,
+  onMove,
+  totalCount,
+}) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: dua.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 100 : 1,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-2 group ${isDragging ? 'relative' : ''}`}
+    >
+      {isReordering && (
+        <div className="flex flex-col gap-1 shrink-0">
+          <button
+            onClick={(e) => onMove('up', e)}
+            disabled={index === 0}
+            className="p-1 text-primary/40 hover:text-accent disabled:opacity-10 transition-colors"
+            title="تحريك للأعلى"
+          >
+            <ArrowUp size={16} />
+          </button>
+          <div 
+            {...attributes} 
+            {...listeners}
+            className="p-1 text-primary/20 cursor-grab active:cursor-grabbing hover:text-accent transition-colors"
+          >
+            <GripVertical size={16} />
+          </div>
+          <button
+            onClick={(e) => onMove('down', e)}
+            disabled={index === totalCount - 1}
+            className="p-1 text-primary/40 hover:text-accent disabled:opacity-10 transition-colors"
+            title="تحريك للأسفل"
+          >
+            <ArrowDown size={16} />
+          </button>
+        </div>
+      )}
+      
+      <button
+        onClick={onSelect}
+        className={`flex-1 w-full text-right p-4 rounded-2xl transition-all flex items-start gap-4 ${
+          currentIndex === index 
+            ? 'bg-accent/10 border border-accent/20' 
+            : 'bg-secondary hover:bg-primary/5 border border-transparent'
+        }`}
+      >
+        <span className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-mono ${
+          currentIndex === index ? 'bg-accent text-white' : 'bg-primary/5 text-primary/60'
+        }`}>
+          {index + 1}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="arabic-text text-base leading-relaxed line-clamp-2 text-primary">
+            {dua.text}
+          </p>
+          {isFavorite && (
+            <Star size={12} className="text-accent mt-1" fill="currentColor" />
+          )}
+        </div>
+        {!isReordering && isCustom && dua.id !== 'empty' && (
+          <div className="flex gap-1 shrink-0">
+            <div
+              onClick={onEdit}
+              className="p-2 text-primary/40 hover:text-accent transition-colors"
+            >
+              <Edit2 size={16} />
+            </div>
+            <div
+              onClick={onDelete}
+              className="p-2 text-primary/40 hover:text-red-500 transition-colors"
+            >
+              <Trash2 size={16} />
+            </div>
+          </div>
+        )}
+      </button>
+    </div>
+  );
+};
+
 const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
   const [activeCategory, setActiveCategory] = useState<DuaCategory>(() => {
     const saved = localStorage.getItem('dua_active_category');
@@ -25,6 +161,18 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
   const [categoryIndices, setCategoryIndices] = useState<Record<DuaCategory, number>>(() => {
     const saved = localStorage.getItem('dua_category_indices');
     return saved ? JSON.parse(saved) : { quran: 0, sunnah: 0, khatm: 0, custom: 0 };
+  });
+  const [quranDuas, setQuranDuas] = useState<any[]>(() => {
+    const saved = localStorage.getItem('quran_duas_order');
+    return saved ? JSON.parse(saved) : QURAN_DUAS;
+  });
+  const [sunnahDuas, setSunnahDuas] = useState<any[]>(() => {
+    const saved = localStorage.getItem('sunnah_duas_order');
+    return saved ? JSON.parse(saved) : SUNNAH_DUAS;
+  });
+  const [khatmDuas, setKhatmDuas] = useState<any[]>(() => {
+    const saved = localStorage.getItem('khatm_duas_order');
+    return saved ? JSON.parse(saved) : KHATM_QURAN_DUA;
   });
   const [customDuas, setCustomDuas] = useState<CustomDua[]>(() => {
     const saved = localStorage.getItem('custom_duas');
@@ -67,13 +215,25 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
     localStorage.setItem('custom_duas', JSON.stringify(customDuas));
   }, [customDuas]);
 
+  useEffect(() => {
+    localStorage.setItem('quran_duas_order', JSON.stringify(quranDuas));
+  }, [quranDuas]);
+
+  useEffect(() => {
+    localStorage.setItem('sunnah_duas_order', JSON.stringify(sunnahDuas));
+  }, [sunnahDuas]);
+
+  useEffect(() => {
+    localStorage.setItem('khatm_duas_order', JSON.stringify(khatmDuas));
+  }, [khatmDuas]);
+
   const getActiveData = () => {
     switch (activeCategory) {
-      case 'quran': return QURAN_DUAS;
-      case 'sunnah': return SUNNAH_DUAS;
-      case 'khatm': return KHATM_QURAN_DUA;
+      case 'quran': return quranDuas;
+      case 'sunnah': return sunnahDuas;
+      case 'khatm': return khatmDuas;
       case 'custom': return customDuas.length > 0 ? customDuas : [{ id: 'empty', text: 'لا توجد أدعية خاصة بك بعد. أضف دعاءك الأول!' }];
-      default: return QURAN_DUAS;
+      default: return quranDuas;
     }
   };
 
@@ -98,6 +258,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
   const handleCategoryChange = (category: DuaCategory) => {
     setActiveCategory(category);
     setShowVirtue(false);
+    setIsReordering(false);
   };
 
   const toggleFavorite = (id: string) => {
@@ -108,6 +269,22 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
   };
 
   const isFavorite = (id: string) => favorites.includes(id);
+
+  const handleShare = () => {
+    if (!currentDua) return;
+    const text = `${currentDua.text}\n\n${currentDua.hadith ? `${currentDua.hadith}\n` : ''}${currentDua.virtue ? `الفضل: ${currentDua.virtue}\n` : ''}\nتمت المشاركة من تطبيق الأذكار`;
+    
+    if (navigator.share) {
+      navigator.share({
+        title: 'دعاء',
+        text: text,
+      }).catch(console.error);
+    } else {
+      navigator.clipboard.writeText(text).then(() => {
+        // You could add a toast here if you have one
+      });
+    }
+  };
 
   const handleSaveCustomDua = () => {
     if (!newDuaText.trim()) return;
@@ -155,21 +332,61 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
     setShowAddModal(true);
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const updateList = (items: any[]) => {
+        const oldIndex = items.findIndex((item) => item.id === active.id);
+        const newIndex = items.findIndex((item) => item.id === over.id);
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        
+        // Update current index if needed
+        if (currentIndex === oldIndex) {
+          setCategoryIndices(prev => ({ ...prev, [activeCategory]: newIndex }));
+        } else if (currentIndex > oldIndex && currentIndex <= newIndex) {
+          setCategoryIndices(prev => ({ ...prev, [activeCategory]: currentIndex - 1 }));
+        } else if (currentIndex < oldIndex && currentIndex >= newIndex) {
+          setCategoryIndices(prev => ({ ...prev, [activeCategory]: currentIndex + 1 }));
+        }
+        
+        return newItems;
+      };
+
+      if (activeCategory === 'custom') setCustomDuas(updateList);
+      else if (activeCategory === 'quran') setQuranDuas(updateList);
+      else if (activeCategory === 'sunnah') setSunnahDuas(updateList);
+      else if (activeCategory === 'khatm') setKhatmDuas(updateList);
+    }
+  };
+
   const moveDua = (index: number, direction: 'up' | 'down', e: React.MouseEvent) => {
     e.stopPropagation();
-    if (direction === 'up' && index > 0) {
-      const newDuas = [...customDuas];
-      [newDuas[index - 1], newDuas[index]] = [newDuas[index], newDuas[index - 1]];
-      setCustomDuas(newDuas);
-      if (currentIndex === index) setCategoryIndices(prev => ({ ...prev, custom: index - 1 }));
-      else if (currentIndex === index - 1) setCategoryIndices(prev => ({ ...prev, custom: index }));
-    } else if (direction === 'down' && index < customDuas.length - 1) {
-      const newDuas = [...customDuas];
-      [newDuas[index + 1], newDuas[index]] = [newDuas[index], newDuas[index + 1]];
-      setCustomDuas(newDuas);
-      if (currentIndex === index) setCategoryIndices(prev => ({ ...prev, custom: index + 1 }));
-      else if (currentIndex === index + 1) setCategoryIndices(prev => ({ ...prev, custom: index }));
-    }
+    const updateList = (items: any[]) => {
+      const newDuas = [...items];
+      if (direction === 'up' && index > 0) {
+        [newDuas[index - 1], newDuas[index]] = [newDuas[index], newDuas[index - 1]];
+        if (currentIndex === index) setCategoryIndices(prev => ({ ...prev, [activeCategory]: index - 1 }));
+        else if (currentIndex === index - 1) setCategoryIndices(prev => ({ ...prev, [activeCategory]: index }));
+      } else if (direction === 'down' && index < items.length - 1) {
+        [newDuas[index + 1], newDuas[index]] = [newDuas[index], newDuas[index + 1]];
+        if (currentIndex === index) setCategoryIndices(prev => ({ ...prev, [activeCategory]: index + 1 }));
+        else if (currentIndex === index + 1) setCategoryIndices(prev => ({ ...prev, [activeCategory]: index }));
+      }
+      return newDuas;
+    };
+
+    if (activeCategory === 'custom') setCustomDuas(updateList);
+    else if (activeCategory === 'quran') setQuranDuas(updateList);
+    else if (activeCategory === 'sunnah') setSunnahDuas(updateList);
+    else if (activeCategory === 'khatm') setKhatmDuas(updateList);
   };
 
   return (
@@ -195,7 +412,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
               activeCategory === 'sunnah' ? 'text-accent' : 'text-primary/60 opacity-70'
             }`}
           >
-            <Hand size={24} />
+            <Quote size={24} />
             <span className="text-[10px] font-medium uppercase tracking-widest">من السنة</span>
             {activeCategory === 'sunnah' && (
               <motion.div layoutId="activeTab" className="h-0.5 w-full bg-accent mt-1" />
@@ -248,6 +465,13 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
             </button>
           </div>
           <div className="flex gap-2">
+            <button 
+              onClick={handleShare}
+              className="p-2 rounded-xl bg-surface border border-primary/10 text-primary/60 hover:text-accent hover:border-accent transition-all"
+              title="مشاركة"
+            >
+              <Share2 size={20} />
+            </button>
             <button 
               onClick={() => toggleFavorite(currentDua.id)}
               className={`p-2 rounded-xl transition-all ${isFavorite(currentDua.id) ? 'bg-accent/20 text-accent' : 'bg-surface border border-primary/10 text-primary/60'}`}
@@ -362,7 +586,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
               <div className="p-6 border-b border-primary/10 flex items-center justify-between shrink-0">
                 <h3 className="text-lg font-bold text-primary">قائمة الأدعية</h3>
                 <div className="flex items-center gap-2">
-                  {activeCategory === 'custom' && customDuas.length > 0 && (
+                  {activeData.length > 0 && activeData[0].id !== 'empty' && (
                     <button
                       onClick={() => setIsReordering(!isReordering)}
                       className={`p-2 rounded-xl transition-all ${isReordering ? 'bg-accent text-white' : 'bg-secondary text-primary/60 hover:text-accent'}`}
@@ -395,69 +619,42 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                {activeData.map((dua, index) => (
-                  <div key={dua.id} className="flex items-center gap-2">
-                    {activeCategory === 'custom' && isReordering && (
-                      <div className="flex flex-col gap-1">
-                        <button 
-                          onClick={(e) => moveDua(index, 'up', e)}
-                          disabled={index === 0}
-                          className="p-1 text-primary/40 hover:text-accent disabled:opacity-30"
-                        >
-                          <ChevronRight size={16} className="rotate-90" />
-                        </button>
-                        <button 
-                          onClick={(e) => moveDua(index, 'down', e)}
-                          disabled={index === customDuas.length - 1}
-                          className="p-1 text-primary/40 hover:text-accent disabled:opacity-30"
-                        >
-                          <ChevronRight size={16} className="-rotate-90" />
-                        </button>
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={activeData.map(d => d.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {activeData.length > 0 && activeData[0].id !== 'empty' ? (
+                      activeData.map((dua, index) => (
+                        <SortableDuaItem
+                          key={dua.id}
+                          dua={dua}
+                          index={index}
+                          currentIndex={currentIndex}
+                          isReordering={isReordering}
+                          isFavorite={isFavorite(dua.id)}
+                          isCustom={activeCategory === 'custom'}
+                          onSelect={() => {
+                            setCategoryIndices(prev => ({ ...prev, [activeCategory]: index }));
+                            setShowListModal(false);
+                          }}
+                          onEdit={(e) => handleEditCustomDua(dua, e)}
+                          onDelete={(e) => handleDeleteCustomDua(dua.id, e)}
+                          onMove={(dir, e) => moveDua(index, dir, e)}
+                          totalCount={activeData.length}
+                        />
+                      ))
+                    ) : (
+                      <div className="text-center p-8 text-primary/40">
+                        لا توجد أدعية مضافة
                       </div>
                     )}
-                    <button
-                      onClick={() => {
-                        setCategoryIndices(prev => ({ ...prev, [activeCategory]: index }));
-                        setShowListModal(false);
-                      }}
-                      className={`flex-1 w-full text-right p-4 rounded-2xl transition-all flex items-start gap-4 ${
-                        currentIndex === index 
-                          ? 'bg-accent/10 border border-accent/20' 
-                          : 'bg-secondary hover:bg-primary/5 border border-transparent'
-                      }`}
-                    >
-                      <span className={`shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-mono ${
-                        currentIndex === index ? 'bg-accent text-white' : 'bg-primary/5 text-primary/60'
-                      }`}>
-                        {index + 1}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className="arabic-text text-base leading-relaxed line-clamp-2 text-primary">
-                          {dua.text}
-                        </p>
-                        {isFavorite(dua.id) && (
-                          <Star size={12} className="text-accent mt-1" fill="currentColor" />
-                        )}
-                      </div>
-                      {activeCategory === 'custom' && !isReordering && dua.id !== 'empty' && (
-                        <div className="flex gap-1 shrink-0">
-                          <div
-                            onClick={(e) => handleEditCustomDua(dua as CustomDua, e)}
-                            className="p-2 text-primary/40 hover:text-accent transition-colors"
-                          >
-                            <Edit2 size={16} />
-                          </div>
-                          <div
-                            onClick={(e) => handleDeleteCustomDua(dua.id, e)}
-                            className="p-2 text-primary/40 hover:text-red-500 transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </div>
-                        </div>
-                      )}
-                    </button>
-                  </div>
-                ))}
+                  </SortableContext>
+                </DndContext>
               </div>
             </motion.div>
           </motion.div>
