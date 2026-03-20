@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronRight, Sun, Moon, CheckCircle2, BookOpen, RotateCcw, Edit2, Trash2, Plus, ArrowUp, ArrowDown } from 'lucide-react';
+import { ChevronRight, Sun, Moon, CheckCircle2, BookOpen, RotateCcw, Edit2, Trash2, Plus, ArrowUp, ArrowDown, Share2 } from 'lucide-react';
 import { MORNING_ADHKAR, EVENING_ADHKAR, AdhkarItem } from '../data/morningEvening';
 import {
   DndContext,
@@ -20,10 +20,11 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 
 interface Props {
+  onClose: () => void;
 }
 
 
-const SortableItem = ({ item, index, isEditMode, handleIncrement, setShowDeleteConfirm, showVirtueFor, setShowVirtueFor, getProgress, onEdit, onMoveUp, onMoveDown, isFirst, isLast }: any) => {
+const SortableItem = ({ item, index, isEditMode, handleIncrement, setShowDeleteConfirm, showVirtueFor, setShowVirtueFor, getProgress, onEdit, onMoveUp, onMoveDown, isFirst, isLast, onShare }: any) => {
     const {
       attributes,
       listeners,
@@ -118,12 +119,15 @@ const SortableItem = ({ item, index, isEditMode, handleIncrement, setShowDeleteC
               {item.hadith && (
                 <p><span className="font-bold text-accent">الحديث:</span> {item.hadith}</p>
               )}
+              {item.source && (
+                <p><span className="font-bold text-accent">المصدر:</span> {item.source}</p>
+              )}
             </motion.div>
           )}
 
           <div className="flex items-center justify-between mt-4 pt-4 border-t border-primary/10">
             <div className="flex gap-2">
-              {!isEditMode && (item.virtue || item.hadith || item.meaning) && (
+              {!isEditMode && (item.virtue || item.hadith || item.meaning || item.source) && (
                 <button 
                   onClick={(e) => {
                     e.stopPropagation();
@@ -132,6 +136,17 @@ const SortableItem = ({ item, index, isEditMode, handleIncrement, setShowDeleteC
                   className="p-2 rounded-full bg-primary/5 text-primary/70 hover:bg-primary/10 hover:text-primary transition-colors"
                 >
                   <BookOpen size={18} />
+                </button>
+              )}
+              {!isEditMode && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShare(item);
+                  }}
+                  className="p-2 rounded-full bg-primary/5 text-primary/70 hover:bg-primary/10 hover:text-primary transition-colors"
+                >
+                  <Share2 size={18} />
                 </button>
               )}
             </div>
@@ -159,7 +174,7 @@ const SortableItem = ({ item, index, isEditMode, handleIncrement, setShowDeleteC
     );
   };
 
-export default function MorningEveningView({}: Props) {
+export default function MorningEveningView({ onClose }: Props) {
   const todayStr = new Date().toISOString().split('T')[0];
   const storageKey = 'morning_evening_progress';
   const listStorageKey = 'user_adhkar_list';
@@ -186,6 +201,7 @@ export default function MorningEveningView({}: Props) {
   });
   const [showVirtueFor, setShowVirtueFor] = useState<string | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showResetListConfirm, setShowResetListConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<AdhkarItem | null>(null);
@@ -224,6 +240,11 @@ export default function MorningEveningView({}: Props) {
   const resetProgress = () => {
     setProgress({});
     setShowResetConfirm(false);
+  };
+
+  const resetListToDefault = () => {
+    setUserList({ morning: MORNING_ADHKAR, evening: EVENING_ADHKAR });
+    setShowResetListConfirm(false);
   };
 
   const handleEdit = (item: AdhkarItem) => {
@@ -302,6 +323,18 @@ export default function MorningEveningView({}: Props) {
   };
 
   const getProgress = (id: string) => progress[id] || 0;
+  const handleShare = (item: AdhkarItem) => {
+    const text = `${item.text}\n\n${item.virtue ? `الفضل: ${item.virtue}\n` : ''}${item.hadith ? `الحديث: ${item.hadith}\n` : ''}${item.meaning ? `المعنى: ${item.meaning}\n` : ''}\nتمت المشاركة من تطبيق الأذكار`;
+    if (navigator.share) {
+      navigator.share({
+        title: 'ذكر',
+        text: text,
+      }).catch(console.error);
+    } else {
+      navigator.clipboard.writeText(text);
+      alert('تم نسخ الذكر إلى الحافظة');
+    }
+  };
   const isComplete = (item: AdhkarItem) => getProgress(item.id) >= item.count;
 
   const completedCount = currentList.filter(isComplete).length;
@@ -314,6 +347,10 @@ export default function MorningEveningView({}: Props) {
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
 
       <header className="z-20 glass-panel px-4 py-4 rounded-b-3xl shadow-sm shrink-0 w-full max-w-md mx-auto">
+        <div className="flex items-center justify-center mb-4">
+          <h1 className="text-xl font-bold">أذكار الصباح والمساء</h1>
+        </div>
+
         <div className="flex bg-primary/10 p-1 rounded-2xl relative">
           <div 
             className="absolute top-1 bottom-1 w-[calc(50%-4px)] bg-surface rounded-xl shadow-sm transition-all duration-300 ease-in-out"
@@ -343,6 +380,15 @@ export default function MorningEveningView({}: Props) {
           >
             <Edit2 size={18} />
           </button>
+          {isEditMode && (
+            <button
+              onClick={() => setShowResetListConfirm(true)}
+              className="p-2 rounded-xl hover:bg-red-100 text-red-600 transition-colors"
+              title="استعادة القائمة الافتراضية"
+            >
+              <RotateCcw size={18} />
+            </button>
+          )}
           <div className="flex-1 h-4 bg-primary/10 rounded-full overflow-hidden relative flex items-center justify-center">
             <motion.div 
               className="absolute right-0 top-0 bottom-0 bg-accent"
@@ -394,6 +440,40 @@ export default function MorningEveningView({}: Props) {
                   className="flex-1 py-3 rounded-xl bg-accent text-white font-bold"
                 >
                   تصفير
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        {showResetListConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+            onClick={() => setShowResetListConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-surface p-6 rounded-3xl shadow-xl max-w-sm w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-bold mb-4 text-red-600">استعادة القائمة الافتراضية</h3>
+              <p className="text-primary/70 mb-6">هل أنت متأكد من أنك تريد استعادة القائمة الافتراضية؟ سيتم حذف جميع الأذكار التي أضفتها أو عدلتها.</p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowResetListConfirm(false)}
+                  className="flex-1 py-3 rounded-xl bg-primary/10 font-bold"
+                >
+                  إلغاء
+                </button>
+                <button
+                  onClick={resetListToDefault}
+                  className="flex-1 py-3 rounded-xl bg-red-600 text-white font-bold"
+                >
+                  استعادة
                 </button>
               </div>
             </motion.div>
@@ -529,6 +609,7 @@ export default function MorningEveningView({}: Props) {
                 onMoveDown={() => moveDown(index)}
                 isFirst={index === 0}
                 isLast={index === currentList.length - 1}
+                onShare={handleShare}
               />
             ))}
           </SortableContext>

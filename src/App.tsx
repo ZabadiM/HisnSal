@@ -877,47 +877,31 @@ export default function App() {
   
 
 
-  // --- Render Manage View ---
-  if (view === 'manage') {
-    return <ManageDhikrView 
-      dhikrList={dhikrList} 
-      setDhikrList={setDhikrList} 
-      onClose={closeOverlay} 
-    />;
-  }
+  // --- Render View Content ---
+  const renderViewContent = () => {
+    switch (view) {
+      case 'manage':
+        return (
+          <ManageDhikrView 
+            dhikrList={dhikrList} 
+            setDhikrList={setDhikrList} 
+            onClose={() => setView('main')} 
+          />
+        );
+      case 'morning_evening':
+        return <MorningEveningView onClose={() => setView('main')} />;
+      case 'hisn_muslim':
+        return <HisnMuslimView onClose={() => setView('main')} />;
+      case 'duas':
+        return <DuasView onBack={() => setView('main')} isDarkMode={isDarkMode} />;
+      case 'stats':
+        return renderStatsView();
+      default:
+        return renderMainView();
+    }
+  };
 
-  // --- Render Morning & Evening View ---
-  if (view === 'morning_evening') {
-    return (
-      <>
-        <MorningEveningView />
-        <BottomNav currentView={view} onChangeView={changeView} />
-      </>
-    );
-  }
-
-  // --- Render Hisn Muslim View ---
-  if (view === 'hisn_muslim') {
-    return (
-      <>
-        <HisnMuslimView onClose={() => changeView('main')} />
-        <BottomNav currentView={view} onChangeView={changeView} />
-      </>
-    );
-  }
-
-  // --- Render Duas View ---
-  if (view === 'duas') {
-    return (
-      <>
-        <DuasView onBack={() => changeView('main')} />
-        <BottomNav currentView={view} onChangeView={changeView} />
-      </>
-    );
-  }
-
-  // --- Render Statistics View ---
-  if (view === 'stats') {
+  const renderStatsView = () => {
     const generateChartData = (period: 'week' | 'month' | 'year' | 'all') => {
       let length = 7;
       let step = 1; // in days
@@ -963,19 +947,19 @@ export default function App() {
     const chartData = generateChartData(chartPeriod);
 
     return (
-      <div className="h-[100dvh] flex flex-col items-center p-6 bg-secondary text-primary overflow-hidden relative">
+      <div className="flex-1 flex flex-col items-center p-6 bg-secondary text-primary overflow-hidden relative w-full">
         {/* Background Decoration */}
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-accent/5 blur-3xl pointer-events-none" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
 
         <header className="w-full max-w-md flex justify-between items-center mb-6 z-10 glass-panel px-6 py-4 rounded-2xl shrink-0">
           <h1 className="text-2xl font-bold font-serif">إحصائيات الإنجاز</h1>
-          <button onClick={() => changeView('main')} className="p-2 rounded-full hover:bg-primary/10 transition-colors">
+          <button onClick={() => setView('main')} className="p-2 rounded-full hover:bg-primary/10 transition-colors">
             <X size={24} />
           </button>
         </header>
 
-        <main className="w-full max-w-md flex flex-col gap-6 pb-8 z-10 flex-1 overflow-y-auto scrollbar-hide pr-2">
+        <main className="w-full max-w-md flex flex-col gap-6 pb-24 z-10 flex-1 overflow-y-auto scrollbar-hide pr-2">
 
           <div className="grid grid-cols-2 gap-4">
             <StatCard title="اليوم" stats={todayStats} icon={<Clock size={20} className="text-blue-500" />} />
@@ -1069,161 +1053,360 @@ export default function App() {
         </main>
       </div>
     );
-  }
+  };
 
-  // --- Render Main View ---
-  return (
-    <div className="h-[100dvh] flex flex-col items-center justify-between pt-6 px-6 pb-0 bg-secondary text-primary overflow-hidden relative">
-      {/* Background Decoration */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-accent/5 blur-3xl pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
-
-      {/* Header */}
-      <header className="w-full max-w-md flex justify-between items-center mb-4 z-10 glass-panel px-4 py-3 rounded-2xl">
-        <div className="flex items-center gap-1">
-          <button 
-            onClick={() => openModal('list')}
-            className="p-2.5 rounded-xl hover:bg-primary/10 transition-colors"
-            title="قائمة الأذكار"
-          >
-            <Menu size={22} />
-          </button>
-          <button 
-            onClick={() => changeView('stats')}
-            className="p-2.5 rounded-xl hover:bg-primary/10 transition-colors"
-            title="الإحصائيات"
-          >
-            <BarChart3 size={22} />
-          </button>
-          <button 
-            onClick={() => changeView('manage')}
-            className="p-2.5 rounded-xl hover:bg-primary/10 transition-colors"
-            title="إدارة الأذكار"
-          >
-            <Edit2 size={20} />
-          </button>
-        </div>
-        <div className="flex gap-1 sm:gap-2">
-          <button 
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            className="p-2.5 rounded-xl hover:bg-primary/10 transition-colors"
-            title={isDarkMode ? 'الوضع النهاري' : 'الوضع الليلي'}
-          >
-            {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-          </button>
-          <button 
-            onClick={() => openModal('sound')}
-            className="p-2.5 rounded-xl hover:bg-primary/10 transition-colors"
-            title="إعدادات الصوت"
-          >
-            {soundEnabled || alertEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
-          </button>
-          <button 
-            onClick={() => setMode(mode === 'counter' ? 'timer' : 'counter')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-secondary hover:bg-primary/90 transition-all shadow-sm"
-          >
-            {mode === 'counter' ? <TimerIcon size={18} /> : <Hash size={18} />}
-            <span className="text-sm font-medium">{mode === 'counter' ? 'مؤقت' : 'عداد'}</span>
-          </button>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="flex-1 min-h-0 w-full max-w-md flex flex-col items-center gap-8 z-10 overflow-y-auto scrollbar-hide py-4 pb-24">
-        
-        {dhikrList.length === 0 ? (
+  const renderMainView = () => {
+    if (dhikrList.length === 0) {
+      return (
+        <div className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-md mx-auto">
           <div className="text-center p-8 glass-panel rounded-3xl w-full">
             <p className="text-lg text-primary/60 mb-4">لا يوجد أذكار في القائمة</p>
             <button 
-              onClick={() => changeView('manage')}
+              onClick={() => setView('manage')}
               className="px-6 py-3 bg-primary text-secondary rounded-xl font-medium shadow-md hover:scale-105 transition-transform"
             >
               إضافة ذكر جديد
             </button>
           </div>
-        ) : (
-          <>
-            <div className="flex justify-center gap-2 w-full mb-[-1.5rem] z-20 relative px-4">
-              <button 
-                onClick={() => setFontSize(f => Math.min(f + 4, 72))} 
-                className="w-10 h-10 flex items-center justify-center text-primary/60 hover:text-primary transition-colors font-bold text-lg rounded-full glass-panel hover:bg-primary/5 shrink-0"
-                title="تكبير الخط"
-              >
-                A+
-              </button>
-              <button 
-                onClick={() => openModal('autoAdvance')}
-                className={`px-4 h-10 flex items-center justify-center rounded-full glass-panel transition-colors text-sm font-bold ${(autoAdvanceSettings.counter || autoAdvanceSettings.timerTimeUp || autoAdvanceSettings.timerTargetReached) ? 'bg-primary/10 text-primary border-primary/20' : 'text-primary/60 hover:text-primary hover:bg-primary/5'}`}
-                title="إعدادات الانتقال التلقائي"
-              >
-                الانتقال التلقائي
-              </button>
-              <button 
-                onClick={() => setFontSize(f => Math.max(f - 4, 16))} 
-                className="w-10 h-10 flex items-center justify-center text-primary/60 hover:text-primary transition-colors font-bold text-sm rounded-full glass-panel hover:bg-primary/5 shrink-0"
-                title="تصغير الخط"
-              >
-                A-
-              </button>
-            </div>
-            {/* Dhikr Selector */}
-            <div className="w-full flex items-center justify-between gap-4">
-              <button onClick={prevDhikr} className="p-3 rounded-2xl glass-panel hover:bg-primary/5 transition-colors">
-                <ChevronRight size={24} />
-              </button>
-              
-              <div className="flex-1 text-center relative">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={currentDhikr.id}
-                    initial={{ opacity: 0, y: 15, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -15, scale: 0.98 }}
-                    transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
-                    className="space-y-4 py-4"
-                  >
-                    <h2 
-                      className="font-serif arabic-text leading-relaxed transition-all duration-300 text-primary"
-                      style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}
-                    >
-                      {currentDhikr.text}
-                    </h2>
-                    <div className="flex items-center justify-center gap-4 mt-2 pt-2 border-t border-primary/5" data-html2canvas-ignore>
-                      <button 
-                        onClick={() => toggleFavorite(currentDhikr.id)}
-                        className={`inline-flex items-center justify-center transition-colors p-2 rounded-lg hover:bg-primary/5 ${currentDhikr.isFavorite ? 'text-yellow-500 hover:text-yellow-600' : 'text-primary/60 hover:text-primary'}`}
-                        title="مفضلة"
-                      >
-                        <Star size={18} className={currentDhikr.isFavorite ? "fill-current" : ""} />
-                      </button>
-                      {(currentDhikr.virtue || currentDhikr.hadith) && (
-                        <button 
-                          onClick={() => {
-                            if (!showVirtue) openModal('virtue');
-                            else closeOverlay();
-                          }}
-                          className="inline-flex items-center gap-1.5 text-sm font-medium text-primary/60 hover:text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5"
-                        >
-                          <BookOpen size={16} />
-                          <span>فضل الذكر</span>
-                        </button>
-                      )}
-                      <button 
-                        onClick={() => openModal('share')}
-                        className="inline-flex items-center justify-center text-primary/60 hover:text-primary transition-colors p-2 rounded-lg hover:bg-primary/5"
-                        title="مشاركة"
-                      >
-                        <Share2 size={18} />
-                      </button>
-                    </div>
-                  </motion.div>
-                </AnimatePresence>
-              </div>
+        </div>
+      );
+    }
 
-              <button onClick={nextDhikr} className="p-3 rounded-2xl glass-panel hover:bg-primary/5 transition-colors">
-                <ChevronLeft size={24} />
-              </button>
+    return (
+      <div className="flex-1 flex flex-col items-center w-full max-w-md mx-auto overflow-y-auto scrollbar-hide py-4 pb-24">
+        <div className="flex justify-center gap-2 w-full mb-4 z-20 relative px-4">
+          <button 
+            onClick={() => setFontSize(f => Math.min(f + 4, 72))} 
+            className="w-10 h-10 flex items-center justify-center text-primary/60 hover:text-primary transition-colors font-bold text-lg rounded-full glass-panel hover:bg-primary/5 shrink-0"
+            title="تكبير الخط"
+          >
+            A+
+          </button>
+          <button 
+            onClick={() => openModal('autoAdvance')}
+            className={`px-4 h-10 flex items-center justify-center rounded-full glass-panel transition-colors text-sm font-bold ${(autoAdvanceSettings.counter || autoAdvanceSettings.timerTimeUp || autoAdvanceSettings.timerTargetReached) ? 'bg-primary/10 text-primary border-primary/20' : 'text-primary/60 hover:text-primary hover:bg-primary/5'}`}
+            title="إعدادات الانتقال التلقائي"
+          >
+            الانتقال التلقائي
+          </button>
+          <button 
+            onClick={() => setFontSize(f => Math.max(f - 4, 16))} 
+            className="w-10 h-10 flex items-center justify-center text-primary/60 hover:text-primary transition-colors font-bold text-sm rounded-full glass-panel hover:bg-primary/5 shrink-0"
+            title="تصغير الخط"
+          >
+            A-
+          </button>
+        </div>
+        
+        {/* Dhikr Selector */}
+        <div className="w-full flex items-center justify-between gap-4">
+          <button onClick={prevDhikr} className="p-3 rounded-2xl glass-panel hover:bg-primary/5 transition-colors">
+            <ChevronRight size={24} />
+          </button>
+          
+          <div className="flex-1 text-center relative">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentDhikr.id}
+                initial={{ opacity: 0, y: 15, scale: 0.98 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -15, scale: 0.98 }}
+                transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+                className="space-y-4 py-4"
+              >
+                <h2 
+                  className="font-serif arabic-text leading-relaxed transition-all duration-300 text-primary"
+                  style={{ fontSize: `${fontSize}px`, lineHeight: 1.7 }}
+                >
+                  {currentDhikr.text}
+                </h2>
+                <div className="flex items-center justify-center gap-4 mt-2 pt-2 border-t border-primary/5" data-html2canvas-ignore>
+                  <button 
+                    onClick={() => toggleFavorite(currentDhikr.id)}
+                    className={`inline-flex items-center justify-center transition-colors p-2 rounded-lg hover:bg-primary/5 ${currentDhikr.isFavorite ? 'text-yellow-500 hover:text-yellow-600' : 'text-primary/60 hover:text-primary'}`}
+                    title="مفضلة"
+                  >
+                    <Star size={18} className={currentDhikr.isFavorite ? "fill-current" : ""} />
+                  </button>
+                  {(currentDhikr.virtue || currentDhikr.hadith) && (
+                    <button 
+                      onClick={() => {
+                        if (!showVirtue) openModal('virtue');
+                        else closeOverlay();
+                      }}
+                      className="inline-flex items-center gap-1.5 text-sm font-medium text-primary/60 hover:text-primary transition-colors px-3 py-1.5 rounded-lg hover:bg-primary/5"
+                    >
+                      <BookOpen size={16} />
+                      <span>فضل الذكر</span>
+                    </button>
+                  )}
+                  <button 
+                    onClick={() => openModal('share')}
+                    className="inline-flex items-center justify-center text-primary/60 hover:text-primary transition-colors p-2 rounded-lg hover:bg-primary/5"
+                    title="مشاركة"
+                  >
+                    <Share2 size={18} />
+                  </button>
+                </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+
+          <button onClick={nextDhikr} className="p-3 rounded-2xl glass-panel hover:bg-primary/5 transition-colors">
+            <ChevronLeft size={24} />
+          </button>
+        </div>
+
+        {/* Interaction Area */}
+        <div className="relative flex flex-col items-center w-full mt-0">
+          {showVirtueOnMain && currentDhikr.virtue && (
+            <div className="mb-6 px-6 py-3 glass-panel rounded-2xl max-w-[90%] text-center shadow-sm border border-primary/10">
+              <p className="text-sm font-medium text-primary/80 leading-relaxed">
+                {currentDhikr.virtue}
+              </p>
             </div>
+          )}
+          
+          {mode === 'timer' && (
+            <div className="mb-8 flex flex-col items-center w-full glass-panel p-6 rounded-3xl shadow-sm">
+              <div className="text-5xl font-bold font-mono text-primary mb-4 tracking-tight">
+                {formatTime(timeLeft)}
+              </div>
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setIsTimerRunning(!isTimerRunning)}
+                  className="p-4 bg-primary text-secondary rounded-full shadow-lg hover:scale-105 hover:shadow-xl transition-all active:scale-95"
+                >
+                  {isTimerRunning ? <Pause size={24} /> : <Play size={24} fill="currentColor" />}
+                </button>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {[30, 60, 180, 300].map(s => (
+                    <button 
+                      key={s}
+                      onClick={() => { setTimeLeft(s); setInitialTimeLeft(s); setIsTimerRunning(false); }}
+                      className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${timeLeft === s ? 'bg-primary text-secondary border-primary shadow-md' : 'bg-secondary/50 text-primary/70 border-primary/20 hover:bg-primary/10'}`}
+                    >
+                      {s < 60 ? `${s}ث` : `${s/60}د`}
+                    </button>
+                  ))}
+                  <div className="flex items-center gap-1 bg-secondary/50 rounded-xl px-2 border border-primary/20 focus-within:border-primary/50 focus-within:bg-primary/5 transition-all">
+                    <input
+                      type="number"
+                      placeholder="مخصص"
+                      min="1"
+                      className="w-12 bg-transparent text-center text-sm font-bold outline-none text-primary placeholder:text-primary/40 placeholder:font-normal"
+                      value={customTimerInput}
+                      onChange={(e) => setCustomTimerInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          const val = parseInt(customTimerInput);
+                          if (val > 0) {
+                            setTimeLeft(val * 60);
+                            setInitialTimeLeft(val * 60);
+                            setIsTimerRunning(false);
+                            setCustomTimerInput('');
+                          }
+                        }
+                      }}
+                    />
+                    <span className="text-xs font-bold text-primary/70">د</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className="relative w-72 h-72 flex items-center justify-center">
+            <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none drop-shadow-sm" viewBox="0 0 288 288">
+              {/* Background Circle */}
+              <circle
+                cx="144"
+                cy="144"
+                r="136"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="8"
+                className="text-primary/10"
+              />
+              {/* Timer Progress Circle (Inner) */}
+              <motion.circle
+                cx="144"
+                cy="144"
+                r="124"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="6"
+                strokeLinecap="round"
+                className={isTimerComplete ? "text-green-500" : "text-accent"}
+                initial={{ strokeDashoffset: 2 * Math.PI * 124 }}
+                animate={{ strokeDashoffset: 2 * Math.PI * 124 - (timerProgressPercentage / 100) * (2 * Math.PI * 124) }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                style={{ strokeDasharray: 2 * Math.PI * 124 }}
+              />
+              {/* Counter Progress Circle (Outer) */}
+              <motion.circle
+                cx="144"
+                cy="144"
+                r="136"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="8"
+                strokeLinecap="round"
+                className={isCounterComplete ? "text-green-500" : "text-primary"}
+                initial={{ strokeDashoffset: circleCircumference }}
+                animate={{ strokeDashoffset: counterStrokeDashoffset }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                style={{ strokeDasharray: circleCircumference }}
+              />
+            </svg>
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={handleIncrement}
+              className="w-64 h-64 rounded-full bg-surface shadow-[0_8px_32px_rgba(0,0,0,0.08)] flex flex-col items-center justify-center relative overflow-hidden group z-10 border border-primary/5 outline-none focus:outline-none"
+            >
+              <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="text-7xl font-bold tracking-tighter text-primary drop-shadow-sm">
+                {currentCount}
+              </span>
+              <div className="flex flex-col items-center mt-3">
+                <span className="text-sm text-primary/50 uppercase tracking-[0.2em] font-medium">اضغط للتسبيح</span>
+                {currentDhikr.step && currentDhikr.target && currentDhikr.step !== currentDhikr.target && (
+                  <span className="text-xs text-primary/70 mt-2 font-bold bg-primary/10 px-3 py-1 rounded-full">
+                    القسم: {counterProgressValue === 0 && currentCount > 0 ? step : counterProgressValue} / {step}
+                  </span>
+                )}
+                {currentDhikr.target && (
+                  <span className="text-xs text-primary/60 mt-1 font-medium">
+                    الإنجاز: {currentCount} / {currentDhikr.target}
+                  </span>
+                )}
+              </div>
+            </motion.button>
+          </div>
+          
+          <button 
+            onClick={() => openModal('resetMenu')}
+            className="mt-8 p-3 text-primary/40 hover:text-primary hover:rotate-180 transition-all duration-500 bg-primary/5 hover:bg-primary/10 rounded-full outline-none focus:outline-none"
+            title="تصفير العداد"
+          >
+            <RotateCcw size={24} />
+          </button>
+
+          {/* Footer / Info */}
+          <footer className="w-full text-center mt-8 pb-8">
+            {dhikrList.length > 0 && (
+              <>
+                <div className="flex justify-center flex-wrap px-4 mb-1">
+                  {dhikrList.map((dhikr, idx) => {
+                    const dhikrToday = dailyStats[todayStr]?.[dhikr.id];
+                    const dhikrCount = dhikrToday?.sessionCount !== undefined ? dhikrToday.sessionCount : (dhikrToday?.count || 0);
+                    const dhikrTime = dhikrToday?.sessionTimeSpent !== undefined ? dhikrToday.sessionTimeSpent : (dhikrToday?.timeSpent || 0);
+                    
+                    let isCompleted = false;
+                    if (mode === 'counter') {
+                      isCompleted = dhikrCount >= (dhikr.target || 100);
+                    } else {
+                      isCompleted = dhikrTime >= getDefaultTimerForDhikr(dhikr);
+                    }
+
+                    let colorClass = '';
+                    if (isCompleted) {
+                      colorClass = 'bg-green-500 group-hover:bg-green-400';
+                    } else if (dhikr.isFavorite) {
+                      colorClass = 'bg-yellow-500 group-hover:bg-yellow-400';
+                    } else if (idx === currentIndex) {
+                      colorClass = 'bg-primary group-hover:bg-primary/80';
+                    } else {
+                      colorClass = 'bg-primary/20 group-hover:bg-primary/50';
+                    }
+
+                    return (
+                      <button 
+                        key={idx}
+                        onClick={() => jumpToDhikr(idx)}
+                        className="py-3 px-1.5 group cursor-pointer"
+                        aria-label={`الانتقال إلى الذكر ${idx + 1}`}
+                      >
+                        <div className={`h-1.5 rounded-full transition-all duration-500 ${idx === currentIndex ? 'w-8' : 'w-2'} ${colorClass}`} />
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] font-medium text-primary/50 uppercase tracking-[0.2em]">
+                  {currentIndex + 1} من {dhikrList.length} أذكار
+                </p>
+              </>
+            )}
+          </footer>
+        </div>
+      </div>
+    );
+  };
+  return (
+    <div className="h-[100dvh] flex flex-col items-center bg-secondary text-primary overflow-hidden relative">
+      {/* Background Decoration */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-accent/5 blur-3xl pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
+
+      {/* Header (Shared for Main View) */}
+      {view === 'main' && (
+        <header className="w-full max-w-md flex justify-center items-center gap-4 mt-4 mb-4 z-10 glass-panel px-3 py-2 rounded-2xl shrink-0">
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={() => openModal('list')}
+              className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-primary/10 transition-colors"
+              title="قائمة الأذكار"
+            >
+              <Menu size={20} />
+            </button>
+            <button 
+              onClick={() => setView('stats')}
+              className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-primary/10 transition-colors"
+              title="الإحصائيات"
+            >
+              <BarChart3 size={20} />
+            </button>
+            <button 
+              onClick={() => setView('manage')}
+              className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-primary/10 transition-colors"
+              title="إدارة الأذكار"
+            >
+              <Edit2 size={18} />
+            </button>
+          </div>
+          <div className="flex items-center gap-1">
+            <button 
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-primary/10 transition-colors"
+              title={isDarkMode ? 'الوضع النهاري' : 'الوضع الليلي'}
+            >
+              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            <button 
+              onClick={() => openModal('sound')}
+              className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-primary/10 transition-colors"
+              title="إعدادات الصوت"
+            >
+              {soundEnabled || alertEnabled ? <Volume2 size={20} /> : <VolumeX size={20} />}
+            </button>
+            <button 
+              onClick={() => setMode(mode === 'counter' ? 'timer' : 'counter')}
+              className="flex items-center justify-center gap-1.5 h-10 px-3 rounded-xl bg-primary text-secondary hover:bg-primary/90 transition-all shadow-sm"
+            >
+              {mode === 'counter' ? <TimerIcon size={16} /> : <Hash size={16} />}
+              <span className="text-sm font-medium">{mode === 'counter' ? 'مؤقت' : 'عداد'}</span>
+            </button>
+          </div>
+        </header>
+      )}
+
+      {/* Dynamic Content */}
+      <div className="flex-1 w-full overflow-hidden flex flex-col">
+        {renderViewContent()}
+      </div>
+
+      {/* Bottom Navigation (Persistent) */}
+      <BottomNav currentView={view} onChangeView={changeView} />
 
             {/* Sound Settings Modal */}
             <AnimatePresence>
@@ -1683,200 +1866,6 @@ export default function App() {
               )}
             </AnimatePresence>
 
-            {/* Interaction Area */}
-            <div className="relative flex flex-col items-center w-full mt-0">
-              {showVirtueOnMain && currentDhikr.virtue && (
-                <div className="mb-6 px-6 py-3 glass-panel rounded-2xl max-w-[90%] text-center shadow-sm border border-primary/10">
-                  <p className="text-sm font-medium text-primary/80 leading-relaxed">
-                    {currentDhikr.virtue}
-                  </p>
-                </div>
-              )}
-              {mode === 'timer' && (
-                <div className="mb-8 flex flex-col items-center w-full glass-panel p-6 rounded-3xl shadow-sm">
-                  <div className="text-5xl font-bold font-mono text-primary mb-4 tracking-tight">
-                    {formatTime(timeLeft)}
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <button 
-                      onClick={() => setIsTimerRunning(!isTimerRunning)}
-                      className="p-4 bg-primary text-secondary rounded-full shadow-lg hover:scale-105 hover:shadow-xl transition-all active:scale-95"
-                    >
-                      {isTimerRunning ? <Pause size={24} /> : <Play size={24} fill="currentColor" />}
-                    </button>
-                    <div className="flex flex-wrap justify-center gap-2">
-                      {[30, 60, 180, 300].map(s => (
-                        <button 
-                          key={s}
-                          onClick={() => { setTimeLeft(s); setInitialTimeLeft(s); setIsTimerRunning(false); }}
-                          className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all ${timeLeft === s ? 'bg-primary text-secondary border-primary shadow-md' : 'bg-secondary/50 text-primary/70 border-primary/20 hover:bg-primary/10'}`}
-                        >
-                          {s < 60 ? `${s}ث` : `${s/60}د`}
-                        </button>
-                      ))}
-                      <div className="flex items-center gap-1 bg-secondary/50 rounded-xl px-2 border border-primary/20 focus-within:border-primary/50 focus-within:bg-primary/5 transition-all">
-                        <input
-                          type="number"
-                          placeholder="مخصص"
-                          min="1"
-                          className="w-12 bg-transparent text-center text-sm font-bold outline-none text-primary placeholder:text-primary/40 placeholder:font-normal"
-                          value={customTimerInput}
-                          onChange={(e) => setCustomTimerInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              const val = parseInt(customTimerInput);
-                              if (val > 0) {
-                                setTimeLeft(val * 60);
-                                setInitialTimeLeft(val * 60);
-                                setIsTimerRunning(false);
-                                setCustomTimerInput('');
-                              }
-                            }
-                          }}
-                          onBlur={() => {
-                            const val = parseInt(customTimerInput);
-                            if (val > 0) {
-                              setTimeLeft(val * 60);
-                              setInitialTimeLeft(val * 60);
-                              setIsTimerRunning(false);
-                              setCustomTimerInput('');
-                            }
-                          }}
-                        />
-                        <span className="text-xs font-bold text-primary/70">د</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className="relative w-72 h-72 flex items-center justify-center">
-                <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none drop-shadow-sm" viewBox="0 0 288 288">
-                  {/* Background Circle */}
-                  <circle
-                    cx="144"
-                    cy="144"
-                    r="136"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    className="text-primary/10"
-                  />
-                  {/* Timer Progress Circle (Inner) */}
-                  <motion.circle
-                    cx="144"
-                    cy="144"
-                    r="124"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="6"
-                    strokeLinecap="round"
-                    className={isTimerComplete ? "text-green-500" : "text-accent"}
-                    initial={{ strokeDashoffset: 2 * Math.PI * 124 }}
-                    animate={{ strokeDashoffset: 2 * Math.PI * 124 - (timerProgressPercentage / 100) * (2 * Math.PI * 124) }}
-                    transition={{ duration: 0.4, ease: "easeOut" }}
-                    style={{ strokeDasharray: 2 * Math.PI * 124 }}
-                  />
-                  {/* Counter Progress Circle (Outer) */}
-                  <motion.circle
-                    cx="144"
-                    cy="144"
-                    r="136"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    strokeLinecap="round"
-                    className={isCounterComplete ? "text-green-500" : "text-primary"}
-                    initial={{ strokeDashoffset: circleCircumference }}
-                    animate={{ strokeDashoffset: counterStrokeDashoffset }}
-                    transition={{ duration: 0.4, ease: "easeOut" }}
-                    style={{ strokeDasharray: circleCircumference }}
-                  />
-                </svg>
-                <motion.button
-                  whileTap={{ scale: 0.92 }}
-                  onClick={handleIncrement}
-                  className="w-64 h-64 rounded-full bg-surface shadow-[0_8px_32px_rgba(0,0,0,0.08)] flex flex-col items-center justify-center relative overflow-hidden group z-10 border border-primary/5 outline-none focus:outline-none"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  <span className="text-7xl font-bold tracking-tighter text-primary drop-shadow-sm">
-                    {currentCount}
-                  </span>
-                  <div className="flex flex-col items-center mt-3">
-                    <span className="text-sm text-primary/50 uppercase tracking-[0.2em] font-medium">اضغط للتسبيح</span>
-                    {currentDhikr.step && currentDhikr.target && currentDhikr.step !== currentDhikr.target && (
-                      <span className="text-xs text-primary/70 mt-2 font-bold bg-primary/10 px-3 py-1 rounded-full">
-                        القسم: {counterProgressValue === 0 && currentCount > 0 ? step : counterProgressValue} / {step}
-                      </span>
-                    )}
-                    {currentDhikr.target && (
-                      <span className="text-xs text-primary/60 mt-1 font-medium">
-                        الإنجاز: {currentCount} / {currentDhikr.target}
-                      </span>
-                    )}
-                  </div>
-                </motion.button>
-              </div>
-              
-              <button 
-                onClick={() => openModal('resetMenu')}
-                className="mt-8 p-3 text-primary/40 hover:text-primary hover:rotate-180 transition-all duration-500 bg-primary/5 hover:bg-primary/10 rounded-full outline-none focus:outline-none"
-                title="تصفير العداد"
-              >
-                <RotateCcw size={24} />
-              </button>
-
-              {/* Footer / Info */}
-              <footer className="w-full text-center mt-8 pb-8">
-                {dhikrList.length > 0 && (
-                  <>
-                    <div className="flex justify-center flex-wrap px-4 mb-1">
-                      {dhikrList.map((dhikr, idx) => {
-                        const dhikrToday = dailyStats[todayStr]?.[dhikr.id];
-                        const dhikrCount = dhikrToday?.sessionCount !== undefined ? dhikrToday.sessionCount : (dhikrToday?.count || 0);
-                        const dhikrTime = dhikrToday?.sessionTimeSpent !== undefined ? dhikrToday.sessionTimeSpent : (dhikrToday?.timeSpent || 0);
-                        
-                        let isCompleted = false;
-                        if (mode === 'counter') {
-                          isCompleted = dhikrCount >= (dhikr.target || 100);
-                        } else {
-                          isCompleted = dhikrTime >= getDefaultTimerForDhikr(dhikr);
-                        }
-
-                        let colorClass = '';
-                        if (isCompleted) {
-                          colorClass = 'bg-green-500 group-hover:bg-green-400';
-                        } else if (dhikr.isFavorite) {
-                          colorClass = 'bg-yellow-500 group-hover:bg-yellow-400';
-                        } else if (idx === currentIndex) {
-                          colorClass = 'bg-primary group-hover:bg-primary/80';
-                        } else {
-                          colorClass = 'bg-primary/20 group-hover:bg-primary/50';
-                        }
-
-                        return (
-                          <button 
-                            key={idx}
-                            onClick={() => jumpToDhikr(idx)}
-                            className="py-3 px-1.5 group cursor-pointer"
-                            aria-label={`الانتقال إلى الذكر ${idx + 1}`}
-                          >
-                            <div className={`h-1.5 rounded-full transition-all duration-500 ${idx === currentIndex ? 'w-8' : 'w-2'} ${colorClass}`} />
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <p className="text-[11px] font-medium text-primary/50 uppercase tracking-[0.2em]">
-                      {currentIndex + 1} من {dhikrList.length} أذكار
-                    </p>
-                  </>
-                )}
-              </footer>
-            </div>
-          </>
-        )}
-      </main>
-      <BottomNav currentView={view} onChangeView={changeView} />
 
       {/* Hidden Shareable Card - Dedicated for image sharing */}
       <div 
@@ -1954,16 +1943,16 @@ function BottomNav({ currentView, onChangeView }: { currentView: string, onChang
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-secondary/90 backdrop-blur-md border-t border-primary/10 pb-safe">
       <div className="max-w-md mx-auto flex justify-around items-center p-2">
-        <button onClick={() => onChangeView('main')} className={`flex items-center justify-center p-3 rounded-2xl transition-all ${currentView === 'main' ? 'text-accent bg-primary/10 scale-110' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`}>
+        <button onClick={() => onChangeView('main')} className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all ${currentView === 'main' ? 'text-accent bg-primary/10' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`} title="الرئيسية">
           <Hash size={24} />
         </button>
-        <button onClick={() => onChangeView('morning_evening')} className={`flex items-center justify-center p-3 rounded-2xl transition-all ${currentView === 'morning_evening' ? 'text-accent bg-primary/10 scale-110' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`}>
+        <button onClick={() => onChangeView('morning_evening')} className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all ${currentView === 'morning_evening' ? 'text-accent bg-primary/10' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`} title="الأذكار">
           <Sun size={24} />
         </button>
-        <button onClick={() => onChangeView('duas')} className={`flex items-center justify-center p-3 rounded-2xl transition-all ${currentView === 'duas' ? 'text-accent bg-primary/10 scale-110' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`}>
+        <button onClick={() => onChangeView('duas')} className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all ${currentView === 'duas' ? 'text-accent bg-primary/10' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`} title="أدعية">
           <Heart size={24} />
         </button>
-        <button onClick={() => onChangeView('hisn_muslim')} className={`flex items-center justify-center p-3 rounded-2xl transition-all ${currentView === 'hisn_muslim' ? 'text-accent bg-primary/10 scale-110' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`}>
+        <button onClick={() => onChangeView('hisn_muslim')} className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-all ${currentView === 'hisn_muslim' ? 'text-accent bg-primary/10' : 'text-primary/50 hover:text-primary hover:bg-primary/5'}`} title="الحصن">
           <BookOpen size={24} />
         </button>
       </div>
@@ -2093,7 +2082,7 @@ function ManageDhikrView({
   };
 
   return (
-    <div className="h-[100dvh] flex flex-col items-center p-6 bg-secondary text-primary overflow-hidden relative">
+    <div className="flex-1 flex flex-col items-center p-6 bg-secondary text-primary overflow-hidden relative w-full">
       {/* Background Decoration */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-accent/5 blur-3xl pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-primary/5 blur-3xl pointer-events-none" />
