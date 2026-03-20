@@ -205,6 +205,45 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
   });
 
   useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      const state = e.state;
+      if (state && state.view === 'duas') {
+        setShowListModal(state.modal === 'duasList');
+        setShowAddModal(state.modal === 'duasAdd');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const openListModal = () => {
+    window.history.pushState({ view: 'duas', modal: 'duasList' }, '', '#duas-list');
+    setShowListModal(true);
+  };
+
+  const closeListModal = () => {
+    if (window.history.state?.modal === 'duasList') {
+      window.history.back();
+    } else {
+      setShowListModal(false);
+    }
+  };
+
+  const openAddModal = (editingId: string | null = null) => {
+    window.history.pushState({ view: 'duas', modal: 'duasAdd' }, '', '#duas-add');
+    setIsEditing(editingId);
+    setShowAddModal(true);
+  };
+
+  const closeAddModal = () => {
+    if (window.history.state?.modal === 'duasAdd') {
+      window.history.back();
+    } else {
+      setShowAddModal(false);
+    }
+  };
+
+  useEffect(() => {
     localStorage.setItem('favorite_duas', JSON.stringify(favorites));
   }, [favorites]);
 
@@ -321,7 +360,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
     setNewDuaVirtue('');
     setNewDuaHadith('');
     setIsEditing(null);
-    setShowAddModal(false);
+    closeAddModal();
   };
 
   const handleDeleteCustomDua = (id: string, e: React.MouseEvent) => {
@@ -337,8 +376,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
     setNewDuaText(dua.text);
     setNewDuaVirtue(dua.virtue || '');
     setNewDuaHadith(dua.hadith || '');
-    setIsEditing(dua.id);
-    setShowAddModal(true);
+    openAddModal(dua.id);
   };
 
   const sensors = useSensors(
@@ -489,7 +527,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
               <Star size={20} fill={isFavorite(currentDua.id) ? "currentColor" : "none"} />
             </button>
             <button 
-              onClick={() => setShowListModal(true)}
+              onClick={openListModal}
               className="p-2 rounded-xl bg-surface border border-primary/10 text-primary/60 hover:text-accent hover:border-accent transition-all"
               title="قائمة الأدعية"
             >
@@ -583,7 +621,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-            onClick={() => setShowListModal(false)}
+            onClick={closeListModal}
           >
             <motion.div
               initial={{ y: '100%' }}
@@ -609,9 +647,9 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
                       setNewDuaText('');
                       setNewDuaVirtue('');
                       setNewDuaHadith('');
-                      setIsEditing(null);
-                      setShowAddModal(true);
-                      setShowListModal(false);
+                      closeListModal();
+                      // Wait for list modal to close before opening add modal
+                      setTimeout(() => openAddModal(null), 100);
                     }}
                     className="p-2 rounded-xl bg-accent text-white hover:bg-accent/90 transition-colors"
                     title="إضافة دعاء جديد"
@@ -619,7 +657,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
                     <Plus size={20} />
                   </button>
                   <button 
-                    onClick={() => setShowListModal(false)}
+                    onClick={closeListModal}
                     className="p-2 rounded-xl bg-secondary text-primary/60 hover:text-accent"
                   >
                     <X size={24} />
@@ -649,7 +687,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
                           isCustom={activeCategory === 'custom'}
                           onSelect={() => {
                             setCategoryIndices(prev => ({ ...prev, [activeCategory]: index }));
-                            setShowListModal(false);
+                            closeListModal();
                           }}
                           onEdit={(e) => handleEditCustomDua(dua, e)}
                           onDelete={(e) => handleDeleteCustomDua(dua.id, e)}
@@ -677,7 +715,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-            onClick={() => setShowAddModal(false)}
+            onClick={closeAddModal}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -689,7 +727,7 @@ const DuasView: React.FC<DuasViewProps> = ({ onBack, isDarkMode }) => {
               <div className="p-6 border-b border-primary/10 flex items-center justify-between shrink-0">
                 <h3 className="text-lg font-bold text-primary">{isEditing ? 'تعديل الدعاء' : 'إضافة دعاء جديد'}</h3>
                 <button 
-                  onClick={() => setShowAddModal(false)}
+                  onClick={closeAddModal}
                   className="p-2 rounded-xl bg-secondary text-primary/60 hover:text-accent"
                 >
                   <X size={24} />

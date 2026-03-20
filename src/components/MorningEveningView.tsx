@@ -24,7 +24,7 @@ interface Props {
 }
 
 
-const SortableItem = ({ item, index, isEditMode, handleIncrement, setShowDeleteConfirm, showVirtueFor, setShowVirtueFor, getProgress, onEdit, onMoveUp, onMoveDown, isFirst, isLast, onShare }: any) => {
+const SortableItem = ({ item, index, isEditMode, handleIncrement, onDelete, showVirtueFor, setShowVirtueFor, getProgress, onEdit, onMoveUp, onMoveDown, isFirst, isLast, onShare }: any) => {
     const {
       attributes,
       listeners,
@@ -75,7 +75,7 @@ const SortableItem = ({ item, index, isEditMode, handleIncrement, setShowDeleteC
                 )}
                 <div className="flex flex-col gap-1 items-center">
                   <button 
-                    onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(item.id); }}
+                    onClick={(e) => { e.stopPropagation(); onDelete(item.id); }}
                     className="p-2 rounded-full bg-red-100 text-red-600 hover:bg-red-200 transition-colors"
                   >
                     <Trash2 size={18} />
@@ -209,6 +209,39 @@ export default function MorningEveningView({ onClose }: Props) {
   const [newDhikr, setNewDhikr] = useState({ text: '', count: 1, virtue: '', hadith: '', meaning: '' });
 
   React.useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      const state = e.state;
+      if (state && state.view === 'morning_evening') {
+        setShowResetConfirm(state.modal === 'meReset');
+        setShowResetListConfirm(state.modal === 'meResetList');
+        setShowDeleteConfirm(state.modal === 'meDelete' ? state.deleteId : null);
+        setIsAddModalOpen(state.modal === 'meAdd');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const openModal = (modalName: 'meReset' | 'meResetList' | 'meDelete' | 'meAdd', deleteId?: string) => {
+    window.history.pushState({ view: 'morning_evening', modal: modalName, deleteId }, '');
+    if (modalName === 'meReset') setShowResetConfirm(true);
+    if (modalName === 'meResetList') setShowResetListConfirm(true);
+    if (modalName === 'meDelete') setShowDeleteConfirm(deleteId || null);
+    if (modalName === 'meAdd') setIsAddModalOpen(true);
+  };
+
+  const closeModal = (modalName: 'meReset' | 'meResetList' | 'meDelete' | 'meAdd') => {
+    if (window.history.state?.modal === modalName) {
+      window.history.back();
+    } else {
+      if (modalName === 'meReset') setShowResetConfirm(false);
+      if (modalName === 'meResetList') setShowResetListConfirm(false);
+      if (modalName === 'meDelete') setShowDeleteConfirm(null);
+      if (modalName === 'meAdd') setIsAddModalOpen(false);
+    }
+  };
+
+  React.useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({ date: todayStr, data: progress }));
   }, [progress, todayStr]);
 
@@ -234,17 +267,17 @@ export default function MorningEveningView({ onClose }: Props) {
       ...prev,
       [activeTab]: prev[activeTab].filter(item => item.id !== id)
     }));
-    setShowDeleteConfirm(null);
+    closeModal('meDelete');
   };
 
   const resetProgress = () => {
     setProgress({});
-    setShowResetConfirm(false);
+    closeModal('meReset');
   };
 
   const resetListToDefault = () => {
     setUserList({ morning: MORNING_ADHKAR, evening: EVENING_ADHKAR });
-    setShowResetListConfirm(false);
+    closeModal('meResetList');
   };
 
   const handleEdit = (item: AdhkarItem) => {
@@ -256,7 +289,7 @@ export default function MorningEveningView({ onClose }: Props) {
       hadith: item.hadith || '',
       meaning: item.meaning || ''
     });
-    setIsAddModalOpen(true);
+    openModal('meAdd');
   };
 
   const handleAddOrEdit = () => {
@@ -273,7 +306,7 @@ export default function MorningEveningView({ onClose }: Props) {
         [activeTab]: [...prev[activeTab], { id: Date.now().toString(), ...newDhikr }]
       }));
     }
-    setIsAddModalOpen(false);
+    closeModal('meAdd');
     setEditingItem(null);
     setNewDhikr({ text: '', count: 1, virtue: '', hadith: '', meaning: '' });
   };
@@ -324,7 +357,7 @@ export default function MorningEveningView({ onClose }: Props) {
 
   const getProgress = (id: string) => progress[id] || 0;
   const handleShare = (item: AdhkarItem) => {
-    const text = `${item.text}\n\n${item.virtue ? `الفضل: ${item.virtue}\n` : ''}${item.hadith ? `الحديث: ${item.hadith}\n` : ''}${item.meaning ? `المعنى: ${item.meaning}\n` : ''}\nتمت المشاركة من تطبيق الأذكار`;
+    const text = `${item.text}\n\n${item.virtue ? `الفضل: ${item.virtue}\n` : ''}${item.hadith ? `الحديث: ${item.hadith}\n` : ''}${item.meaning ? `المعنى: ${item.meaning}\n` : ''}\n بواسطة تطبيق AzkarSal`;
     if (navigator.share) {
       navigator.share({
         title: 'ذكر',
@@ -332,7 +365,7 @@ export default function MorningEveningView({ onClose }: Props) {
       }).catch(console.error);
     } else {
       navigator.clipboard.writeText(text);
-      alert('تم نسخ الذكر إلى الحافظة');
+      alert('تم نسخ النص');
     }
   };
   const isComplete = (item: AdhkarItem) => getProgress(item.id) >= item.count;
@@ -382,7 +415,7 @@ export default function MorningEveningView({ onClose }: Props) {
           </button>
           {isEditMode && (
             <button
-              onClick={() => setShowResetListConfirm(true)}
+              onClick={() => openModal('meResetList')}
               className="p-2 rounded-xl hover:bg-red-100 text-red-600 transition-colors"
               title="استعادة القائمة الافتراضية"
             >
@@ -401,7 +434,7 @@ export default function MorningEveningView({ onClose }: Props) {
             </span>
           </div>
           <button
-            onClick={() => setShowResetConfirm(true)}
+            onClick={() => openModal('meReset')}
             className="p-2 rounded-xl hover:bg-primary/10 transition-colors text-primary/70"
             title="تصفير التقدم"
           >
@@ -417,7 +450,7 @@ export default function MorningEveningView({ onClose }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            onClick={() => setShowResetConfirm(false)}
+            onClick={() => closeModal('meReset')}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -430,7 +463,7 @@ export default function MorningEveningView({ onClose }: Props) {
               <p className="text-primary/70 mb-6">هل أنت متأكد من أنك تريد تصفير تقدم أذكار {activeTab === 'morning' ? 'الصباح' : 'المساء'}؟</p>
               <div className="flex gap-3">
                 <button
-                  onClick={() => setShowResetConfirm(false)}
+                  onClick={() => closeModal('meReset')}
                   className="flex-1 py-3 rounded-xl bg-primary/10 font-bold"
                 >
                   إلغاء
@@ -451,7 +484,7 @@ export default function MorningEveningView({ onClose }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            onClick={() => setShowResetListConfirm(false)}
+            onClick={() => closeModal('meResetList')}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -464,7 +497,7 @@ export default function MorningEveningView({ onClose }: Props) {
               <p className="text-primary/70 mb-6">هل أنت متأكد من أنك تريد استعادة القائمة الافتراضية؟ سيتم حذف جميع الأذكار التي أضفتها أو عدلتها.</p>
               <div className="flex gap-3">
                 <button
-                  onClick={() => setShowResetListConfirm(false)}
+                  onClick={() => closeModal('meResetList')}
                   className="flex-1 py-3 rounded-xl bg-primary/10 font-bold"
                 >
                   إلغاء
@@ -485,7 +518,7 @@ export default function MorningEveningView({ onClose }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            onClick={() => setShowDeleteConfirm(null)}
+            onClick={() => closeModal('meDelete')}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -498,7 +531,7 @@ export default function MorningEveningView({ onClose }: Props) {
               <p className="text-primary/70 mb-6">هل أنت متأكد من أنك تريد حذف هذا الذكر؟</p>
               <div className="flex gap-3">
                 <button
-                  onClick={() => setShowDeleteConfirm(null)}
+                  onClick={() => closeModal('meDelete')}
                   className="flex-1 py-3 rounded-xl bg-primary/10 font-bold"
                 >
                   إلغاء
@@ -519,7 +552,7 @@ export default function MorningEveningView({ onClose }: Props) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-            onClick={() => setIsAddModalOpen(false)}
+            onClick={() => closeModal('meAdd')}
           >
             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
@@ -600,7 +633,7 @@ export default function MorningEveningView({ onClose }: Props) {
                 index={index} 
                 isEditMode={isEditMode} 
                 handleIncrement={handleIncrement} 
-                setShowDeleteConfirm={setShowDeleteConfirm} 
+                onDelete={(id: string) => openModal('meDelete', id)} 
                 showVirtueFor={showVirtueFor} 
                 setShowVirtueFor={setShowVirtueFor} 
                 getProgress={getProgress}

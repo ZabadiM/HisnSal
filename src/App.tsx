@@ -247,7 +247,7 @@ export default function App() {
   useEffect(() => {
     // Initialize state if not present
     if (!window.history.state) {
-      window.history.replaceState({ view: 'main', modal: null }, '');
+      window.history.replaceState({ view: 'main', modal: null }, '', '#main');
     }
 
     const handlePopState = (e: PopStateEvent) => {
@@ -286,11 +286,11 @@ export default function App() {
     
     // Always push state when changing views
     setView(newView);
-    window.history.pushState({ view: newView, modal: null }, '');
+    window.history.pushState({ view: newView, modal: null }, '', '#' + newView);
   };
 
   const openModal = (modalName: 'list' | 'virtue' | 'share' | 'sound' | 'autoAdvance' | 'resetMenu' | 'generatedImage') => {
-    window.history.pushState({ view: view, modal: modalName }, '');
+    window.history.pushState({ view: view, modal: modalName }, '', '#' + view + '-' + modalName);
     if (modalName === 'list') setShowList(true);
     if (modalName === 'virtue') setShowVirtue(true);
     if (modalName === 'share') setShowShareMenu(true);
