@@ -541,6 +541,8 @@ export default function App() {
     }
   };
 
+  const [activeTasbeehContext, setActiveTasbeehContext] = useState<string | null>(null);
+
   const handleIncrement = () => {
     if (!currentDhikr) return;
     const today = getTodayStr();
@@ -565,6 +567,23 @@ export default function App() {
         }
       };
     });
+
+    if (activeTasbeehContext) {
+      try {
+        const meProgressStr = localStorage.getItem('morning_evening_progress');
+        let meProgress: Record<string, number> = {};
+        if (meProgressStr) {
+          const parsed = JSON.parse(meProgressStr);
+          if (parsed.date === today) {
+            meProgress = parsed.data;
+          }
+        }
+        meProgress[activeTasbeehContext] = (meProgress[activeTasbeehContext] || 0) + 1;
+        localStorage.setItem('morning_evening_progress', JSON.stringify({ date: today, data: meProgress }));
+      } catch (e) {
+        console.error('Failed to update morning/evening progress', e);
+      }
+    }
     
     if (remaining === 0) {
       playBeep('approaching');
@@ -795,14 +814,9 @@ export default function App() {
             onClose={() => changeView('main')} 
             dailyStats={dailyStats}
             dhikrList={dhikrList}
-            onNavigateToTasbeeh={(item) => {
+            onNavigateToTasbeeh={(item, isEvening) => {
               const mappedId = TASBEEH_MAPPING[item.id] || item.id;
               let idx = dhikrList.findIndex(d => d.id === mappedId);
-              
-              // If not found by mapped ID, try finding by exact text match
-              if (idx === -1) {
-                idx = dhikrList.findIndex(d => d.text.trim() === item.text.trim());
-              }
 
               if (idx === -1) {
                 const newDhikr: Dhikr = {
@@ -817,8 +831,47 @@ export default function App() {
                 setDhikrList(prev => [...prev, newDhikr]);
                 idx = dhikrList.length;
               }
+
+              // Always reset sessionCount when navigating to Tasbeeh
+              const today = getTodayStr();
+              setDailyStats(prev => {
+                const todayStats = prev[today] || {};
+                const dhikrStats = todayStats[mappedId] || { count: 0, timeSpent: 0 };
+                return {
+                  ...prev,
+                  [today]: {
+                    ...todayStats,
+                    [mappedId]: {
+                      ...dhikrStats,
+                      sessionCount: 0,
+                      sessionTimeSpent: 0
+                    }
+                  }
+                };
+              });
+
               setCurrentIndex(idx);
+              setActiveTasbeehContext(item.id);
               changeView('main');
+            }}
+            onResetTasbeehSessions={(mappedIds) => {
+              const today = getTodayStr();
+              setDailyStats(prev => {
+                const todayStats = { ...(prev[today] || {}) };
+                mappedIds.forEach(id => {
+                  if (todayStats[id]) {
+                    todayStats[id] = {
+                      ...todayStats[id],
+                      sessionCount: 0,
+                      sessionTimeSpent: 0
+                    };
+                  }
+                });
+                return {
+                  ...prev,
+                  [today]: todayStats
+                };
+              });
             }}
           />
         );

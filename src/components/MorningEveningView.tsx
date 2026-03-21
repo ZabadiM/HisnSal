@@ -21,8 +21,9 @@ import { CSS } from '@dnd-kit/utilities';
 
 interface Props {
   onClose: () => void;
-  onNavigateToTasbeeh?: (item: AdhkarItem) => void;
-  dailyStats?: Record<string, Record<string, { count: number }>>;
+  onNavigateToTasbeeh?: (item: AdhkarItem, isEvening: boolean) => void;
+  onResetTasbeehSessions?: (mappedIds: string[]) => void;
+  dailyStats?: Record<string, Record<string, { count: number, sessionCount?: number }>>;
   dhikrList?: { id: string; text: string }[];
 }
 
@@ -191,7 +192,7 @@ const SortableItem = ({ item, index, isEditMode, handleIncrement, onDelete, show
     );
   };
 
-export default function MorningEveningView({ onClose, onNavigateToTasbeeh, dailyStats = {}, dhikrList = [] }: Props) {
+export default function MorningEveningView({ onClose, onNavigateToTasbeeh, onResetTasbeehSessions, dailyStats = {}, dhikrList = [] }: Props) {
   const todayStr = new Date().toISOString().split('T')[0];
   const storageKey = 'morning_evening_progress';
   const listStorageKey = 'user_adhkar_list';
@@ -226,6 +227,12 @@ export default function MorningEveningView({ onClose, onNavigateToTasbeeh, daily
   const [showStats, setShowStats] = useState(false);
 
   const [newDhikr, setNewDhikr] = useState({ text: '', count: 1, virtue: '', hadith: '', meaning: '' });
+
+  const historyStorageKey = 'morning_evening_history';
+  const [history, setHistory] = useState<Record<string, { morning: number, evening: number }>>(() => {
+    const saved = localStorage.getItem(historyStorageKey);
+    return saved ? JSON.parse(saved) : {};
+  });
 
   React.useEffect(() => {
     const handlePopState = (e: PopStateEvent) => {
@@ -265,7 +272,34 @@ export default function MorningEveningView({ onClose, onNavigateToTasbeeh, daily
 
   React.useEffect(() => {
     localStorage.setItem(storageKey, JSON.stringify({ date: todayStr, data: progress }));
-  }, [progress, todayStr]);
+    
+    // Update history
+    setHistory(prev => {
+      const morningCompleted = userList.morning.filter(item => {
+        const localProgress = progress[item.id] || 0;
+        const mappedId = TASBEEH_MAPPING[item.id] || item.id;
+        const tasbeehProgress = dailyStats[todayStr]?.[mappedId]?.count || 0;
+        return Math.max(localProgress, tasbeehProgress) >= item.count;
+      }).length;
+      
+      const eveningCompleted = userList.evening.filter(item => {
+        const localProgress = progress[item.id] || 0;
+        const mappedId = TASBEEH_MAPPING[item.id] || item.id;
+        const tasbeehProgress = dailyStats[todayStr]?.[mappedId]?.count || 0;
+        return Math.max(localProgress, tasbeehProgress) >= item.count;
+      }).length;
+      
+      const newHistory = {
+        ...prev,
+        [todayStr]: {
+          morning: userList.morning.length > 0 ? morningCompleted / userList.morning.length : 0,
+          evening: userList.evening.length > 0 ? eveningCompleted / userList.evening.length : 0,
+        }
+      };
+      localStorage.setItem(historyStorageKey, JSON.stringify(newHistory));
+      return newHistory;
+    });
+  }, [progress, todayStr, userList, dailyStats]);
 
   React.useEffect(() => {
     localStorage.setItem(listStorageKey, JSON.stringify(userList));
@@ -294,11 +328,41 @@ export default function MorningEveningView({ onClose, onNavigateToTasbeeh, daily
 
   const resetProgress = () => {
     setProgress({});
+    
+    // Reset sessionCount for mapped Tasbeeh items
+    if (onResetTasbeehSessions) {
+      const mappedIdsToReset: string[] = [];
+      [...userList.morning, ...userList.evening].forEach(item => {
+        const mappedId = TASBEEH_MAPPING[item.id];
+        if (mappedId && !mappedIdsToReset.includes(mappedId)) {
+          mappedIdsToReset.push(mappedId);
+        }
+      });
+      if (mappedIdsToReset.length > 0) {
+        onResetTasbeehSessions(mappedIdsToReset);
+      }
+    }
+    
     closeModal('meReset');
   };
 
   const resetListToDefault = () => {
     setUserList({ morning: MORNING_ADHKAR, evening: EVENING_ADHKAR });
+    
+    // Reset sessionCount for mapped Tasbeeh items
+    if (onResetTasbeehSessions) {
+      const mappedIdsToReset: string[] = [];
+      [...MORNING_ADHKAR, ...EVENING_ADHKAR].forEach(item => {
+        const mappedId = TASBEEH_MAPPING[item.id];
+        if (mappedId && !mappedIdsToReset.includes(mappedId)) {
+          mappedIdsToReset.push(mappedId);
+        }
+      });
+      if (mappedIdsToReset.length > 0) {
+        onResetTasbeehSessions(mappedIdsToReset);
+      }
+    }
+    
     closeModal('meResetList');
   };
 
@@ -379,20 +443,9 @@ export default function MorningEveningView({ onClose, onNavigateToTasbeeh, daily
 
   const getProgress = (id: string) => {
     const localProgress = progress[id] || 0;
-    let mappedId = TASBEEH_MAPPING[id] || id;
-    
-    // If not in mapping, check if there is an exact text match in dhikrList
-    if (!TASBEEH_MAPPING[id]) {
-      const item = currentList.find(d => d.id === id);
-      if (item) {
-        const match = dhikrList.find(d => d.text.trim() === item.text.trim());
-        if (match) {
-          mappedId = match.id;
-        }
-      }
-    }
-
-    const tasbeehProgress = dailyStats[todayStr]?.[mappedId]?.count || 0;
+    const mappedId = TASBEEH_MAPPING[id] || id;
+    const stats = dailyStats[todayStr]?.[mappedId];
+    const tasbeehProgress = stats?.sessionCount !== undefined ? stats.sessionCount : (stats?.count || 0);
     return Math.max(localProgress, tasbeehProgress);
   };
   const handleShare = (item: AdhkarItem) => {
@@ -505,7 +558,7 @@ export default function MorningEveningView({ onClose, onNavigateToTasbeeh, daily
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold">إحصائيات الإنجاز</h3>
+                <h3 className="text-xl font-bold">إحصائيات بناء العادة</h3>
                 <button onClick={() => closeModal('meStats')} className="p-2 rounded-full hover:bg-primary/10 transition-colors">
                   <X size={20} />
                 </button>
@@ -513,20 +566,86 @@ export default function MorningEveningView({ onClose, onNavigateToTasbeeh, daily
               
               <div className="space-y-6">
                 <div className="bg-primary/5 p-4 rounded-2xl text-center">
-                  <p className="text-sm font-bold text-primary/60 mb-1">نسبة الإنجاز الكلية</p>
+                  <p className="text-sm font-bold text-primary/60 mb-1">إنجاز اليوم ({activeTab === 'morning' ? 'الصباح' : 'المساء'})</p>
                   <p className="text-3xl font-bold text-accent">{Math.round(progressPercentage)}%</p>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-primary/5 p-4 rounded-2xl text-center">
-                    <p className="text-sm font-bold text-primary/60 mb-1">الأذكار المكتملة</p>
-                    <p className="text-2xl font-bold text-green-500">{completedCount}</p>
-                  </div>
-                  <div className="bg-primary/5 p-4 rounded-2xl text-center">
-                    <p className="text-sm font-bold text-primary/60 mb-1">الأذكار المتبقية</p>
-                    <p className="text-2xl font-bold text-orange-500">{totalCount - completedCount}</p>
-                  </div>
-                </div>
+                {(() => {
+                  const today = new Date();
+                  const currentMonth = today.getMonth();
+                  const currentYear = today.getFullYear();
+                  
+                  let monthCompleted = 0;
+                  let yearCompleted = 0;
+                  
+                  Object.keys(history).forEach(dateStr => {
+                    const d = new Date(dateStr);
+                    const data = history[dateStr];
+                    const target = activeTab === 'morning' ? data.morning : data.evening;
+                    
+                    if (d.getFullYear() === currentYear) {
+                      if (target >= 1) yearCompleted++;
+                      if (d.getMonth() === currentMonth) {
+                        if (target >= 1) monthCompleted++;
+                      }
+                    }
+                  });
+
+                  const days = [];
+                  for (let i = 29; i >= 0; i--) {
+                    const d = new Date(today);
+                    d.setDate(d.getDate() - i);
+                    const dateStr = d.toISOString().split('T')[0];
+                    const dayData = history[dateStr];
+                    
+                    let statusColor = 'bg-red-500/10 border-red-500/20 text-red-500/50';
+                    if (dayData) {
+                      const target = activeTab === 'morning' ? dayData.morning : dayData.evening;
+                      if (target >= 1) {
+                        statusColor = 'bg-green-500 border-green-600 text-white shadow-sm';
+                      } else if (target > 0) {
+                        statusColor = 'bg-yellow-500 border-yellow-600 text-white shadow-sm';
+                      }
+                    }
+                    
+                    days.push(
+                      <div 
+                        key={dateStr} 
+                        className={`w-8 h-8 rounded-lg border flex items-center justify-center text-xs font-bold transition-all ${statusColor}`}
+                        title={`${dateStr}: ${dayData ? Math.round((activeTab === 'morning' ? dayData.morning : dayData.evening) * 100) : 0}%`}
+                      >
+                        {d.getDate()}
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-primary/5 p-4 rounded-2xl text-center">
+                          <p className="text-sm font-bold text-primary/60 mb-1">هذا الشهر</p>
+                          <p className="text-2xl font-bold text-green-500">{monthCompleted} <span className="text-sm text-primary/40 font-normal">يوم</span></p>
+                        </div>
+                        <div className="bg-primary/5 p-4 rounded-2xl text-center">
+                          <p className="text-sm font-bold text-primary/60 mb-1">هذه السنة</p>
+                          <p className="text-2xl font-bold text-green-500">{yearCompleted} <span className="text-sm text-primary/40 font-normal">يوم</span></p>
+                        </div>
+                      </div>
+
+                      <div className="mt-6">
+                        <h4 className="text-sm font-bold text-primary/60 mb-3 text-center">سجل آخر 30 يوم</h4>
+                        <div className="flex flex-wrap gap-2 justify-center">
+                          {days}
+                        </div>
+                        <div className="flex justify-center gap-4 mt-4 text-xs font-bold text-primary/60">
+                          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-green-500"></div> مكتمل</div>
+                          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-yellow-500"></div> جزئي</div>
+                          <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-sm bg-red-500/10 border border-red-500/20"></div> لم يبدأ</div>
+                        </div>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </motion.div>
           </motion.div>
@@ -731,7 +850,7 @@ export default function MorningEveningView({ onClose, onNavigateToTasbeeh, daily
                 isFirst={index === 0}
                 isLast={index === currentList.length - 1}
                 onShare={handleShare}
-                onNavigateToTasbeeh={onNavigateToTasbeeh}
+                onNavigateToTasbeeh={(item: AdhkarItem) => onNavigateToTasbeeh?.(item, activeTab === 'evening')}
               />
             ))}
           </SortableContext>
