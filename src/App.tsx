@@ -276,9 +276,27 @@ export default function App() {
   const changeView = (newView: 'main' | 'stats' | 'manage' | 'morning_evening' | 'hisn_muslim' | 'duas') => {
     if (newView === view) return;
     
-    // Always push state when changing views
-    setView(newView);
-    window.history.pushState({ view: newView, modal: null }, '', '#' + newView);
+    // Close all modals
+    setShowList(false);
+    setShowVirtue(false);
+    setShowShareMenu(false);
+    setShowSoundSettings(false);
+    setShowAutoAdvanceSettings(false);
+    setShowResetMenu(false);
+
+    if (newView === 'main') {
+      // Go back to main using history to pop the current section
+      window.history.back();
+    } else {
+      if (view === 'main') {
+        // From main to a section: push state
+        window.history.pushState({ view: newView, modal: null }, '', '#' + newView);
+      } else {
+        // From one section to another: replace state so back button always goes to main
+        window.history.replaceState({ view: newView, modal: null }, '', '#' + newView);
+      }
+      setView(newView);
+    }
   };
 
   const openModal = (modalName: 'list' | 'virtue' | 'share' | 'sound' | 'autoAdvance' | 'resetMenu') => {
@@ -767,15 +785,15 @@ export default function App() {
           <ManageDhikrView 
             dhikrList={dhikrList} 
             setDhikrList={setDhikrList} 
-            onClose={() => setView('main')} 
+            onClose={() => changeView('main')} 
           />
         );
       case 'morning_evening':
-        return <MorningEveningView onClose={() => setView('main')} />;
+        return <MorningEveningView onClose={() => changeView('main')} />;
       case 'hisn_muslim':
-        return <HisnMuslimView onClose={() => setView('main')} />;
+        return <HisnMuslimView onClose={() => changeView('main')} />;
       case 'duas':
-        return <DuasView onBack={() => setView('main')} isDarkMode={isDarkMode} />;
+        return <DuasView onBack={() => changeView('main')} isDarkMode={isDarkMode} />;
       case 'stats':
         return renderStatsView();
       default:
@@ -836,7 +854,7 @@ export default function App() {
 
         <header className="w-full max-w-md flex justify-between items-center mb-6 z-10 glass-panel px-6 py-4 rounded-2xl shrink-0">
           <h1 className="text-2xl font-bold font-serif">إحصائيات الإنجاز</h1>
-          <button onClick={() => setView('main')} className="p-2 rounded-full hover:bg-primary/10 transition-colors">
+          <button onClick={() => changeView('main')} className="p-2 rounded-full hover:bg-primary/10 transition-colors">
             <X size={24} />
           </button>
         </header>
@@ -944,7 +962,7 @@ export default function App() {
           <div className="text-center p-8 glass-panel rounded-3xl w-full">
             <p className="text-lg text-primary/60 mb-4">لا يوجد أذكار في القائمة</p>
             <button 
-              onClick={() => setView('manage')}
+              onClick={() => changeView('manage')}
               className="px-6 py-3 bg-primary text-secondary rounded-xl font-medium shadow-md hover:scale-105 transition-transform"
             >
               إضافة ذكر جديد
