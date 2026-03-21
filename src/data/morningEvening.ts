@@ -8,6 +8,32 @@ export interface AdhkarItem {
   source?: string;
 }
 
+export const TASBEEH_MAPPING: Record<string, string> = {
+  'm5': 'sayyid-al-istighfar',
+  'm8': 'allahumma-afini',
+  'm9': 'hasbiyallah',
+  'm10': 'bismillah-alladhi',
+  'm11': 'raditu-billahi',
+  'm12': 'ya-hayyu-ya-qayyum',
+  'm14': 'subhanallah-wa-bihamdihi',
+  'm15': 'la-ilaha-illallah-wahdahu',
+  'm16': 'astaghfirullah',
+  'm17': 'salawat',
+  'm19': 'subhanallah-adada-khalqih',
+  'm21': 'la-ilaha-illallah-wahdahu',
+  'e5': 'sayyid-al-istighfar',
+  'e8': 'allahumma-afini',
+  'e9': 'hasbiyallah',
+  'e10': 'bismillah-alladhi',
+  'e11': 'raditu-billahi',
+  'e12': 'ya-hayyu-ya-qayyum',
+  'e15': 'subhanallah-wa-bihamdihi',
+  'e16': 'la-ilaha-illallah-wahdahu',
+  'e17': 'astaghfirullah',
+  'e18': 'salawat',
+  'e21': 'la-ilaha-illallah-wahdahu'
+};
+
 export const MORNING_ADHKAR: AdhkarItem[] = [
   {
     id: 'm1',

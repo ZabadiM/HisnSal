@@ -41,6 +41,7 @@ import {
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { DHIKR_LIST as INITIAL_DHIKR_LIST, Dhikr } from './constants';
+import { TASBEEH_MAPPING } from './data/morningEvening';
 import MorningEveningView from './components/MorningEveningView';
 import HisnMuslimView from './components/HisnMuslimView';
 import DuasView from './components/DuasView';
@@ -789,7 +790,38 @@ export default function App() {
           />
         );
       case 'morning_evening':
-        return <MorningEveningView onClose={() => changeView('main')} />;
+        return (
+          <MorningEveningView 
+            onClose={() => changeView('main')} 
+            dailyStats={dailyStats}
+            dhikrList={dhikrList}
+            onNavigateToTasbeeh={(item) => {
+              const mappedId = TASBEEH_MAPPING[item.id] || item.id;
+              let idx = dhikrList.findIndex(d => d.id === mappedId);
+              
+              // If not found by mapped ID, try finding by exact text match
+              if (idx === -1) {
+                idx = dhikrList.findIndex(d => d.text.trim() === item.text.trim());
+              }
+
+              if (idx === -1) {
+                const newDhikr: Dhikr = {
+                  id: mappedId,
+                  text: item.text,
+                  virtue: item.virtue || '',
+                  hadith: item.hadith || '',
+                  target: item.count,
+                  step: item.count,
+                  defaultTimer: 5,
+                };
+                setDhikrList(prev => [...prev, newDhikr]);
+                idx = dhikrList.length;
+              }
+              setCurrentIndex(idx);
+              changeView('main');
+            }}
+          />
+        );
       case 'hisn_muslim':
         return <HisnMuslimView onClose={() => changeView('main')} />;
       case 'duas':
