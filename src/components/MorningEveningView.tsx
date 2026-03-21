@@ -278,14 +278,16 @@ export default function MorningEveningView({ onClose, onNavigateToTasbeeh, onRes
       const morningCompleted = userList.morning.filter(item => {
         const localProgress = progress[item.id] || 0;
         const mappedId = TASBEEH_MAPPING[item.id] || item.id;
-        const tasbeehProgress = dailyStats[todayStr]?.[mappedId]?.count || 0;
+        const stats = dailyStats[todayStr]?.[mappedId];
+        const tasbeehProgress = stats?.sessionCount !== undefined ? stats.sessionCount : (stats?.count || 0);
         return Math.max(localProgress, tasbeehProgress) >= item.count;
       }).length;
       
       const eveningCompleted = userList.evening.filter(item => {
         const localProgress = progress[item.id] || 0;
         const mappedId = TASBEEH_MAPPING[item.id] || item.id;
-        const tasbeehProgress = dailyStats[todayStr]?.[mappedId]?.count || 0;
+        const stats = dailyStats[todayStr]?.[mappedId];
+        const tasbeehProgress = stats?.sessionCount !== undefined ? stats.sessionCount : (stats?.count || 0);
         return Math.max(localProgress, tasbeehProgress) >= item.count;
       }).length;
       

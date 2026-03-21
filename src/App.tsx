@@ -347,12 +347,17 @@ export default function App() {
     }
   });
 
+  const [activeTasbeehContext, setActiveTasbeehContext] = useState<string | null>(null);
+
   const currentDhikr = dhikrList[currentIndex] || dhikrList[0];
   const todayStr = getTodayStr();
-  const currentCount = dailyStats[todayStr]?.[currentDhikr?.id]?.sessionCount !== undefined 
+  const isSessionActive = activeTasbeehContext === currentDhikr?.id;
+
+  const currentCount = (isSessionActive && dailyStats[todayStr]?.[currentDhikr?.id]?.sessionCount !== undefined)
     ? dailyStats[todayStr]?.[currentDhikr?.id]?.sessionCount! 
     : (dailyStats[todayStr]?.[currentDhikr?.id]?.count || 0);
-  const currentTimeSpent = dailyStats[todayStr]?.[currentDhikr?.id]?.sessionTimeSpent !== undefined 
+
+  const currentTimeSpent = (isSessionActive && dailyStats[todayStr]?.[currentDhikr?.id]?.sessionTimeSpent !== undefined)
     ? dailyStats[todayStr]?.[currentDhikr?.id]?.sessionTimeSpent! 
     : (dailyStats[todayStr]?.[currentDhikr?.id]?.timeSpent || 0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -541,8 +546,6 @@ export default function App() {
     }
   };
 
-  const [activeTasbeehContext, setActiveTasbeehContext] = useState<string | null>(null);
-
   const handleIncrement = () => {
     if (!currentDhikr) return;
     const today = getTodayStr();
@@ -554,14 +557,20 @@ export default function App() {
     setDailyStats(prev => {
       const todayStats = prev[today] || {};
       const dhikrStats = todayStats[currentDhikr.id] || { count: 0, timeSpent: 0 };
-      const newSessionCount = (dhikrStats.sessionCount !== undefined ? dhikrStats.sessionCount : dhikrStats.count || 0) + 1;
+      
+      const isSession = activeTasbeehContext === currentDhikr.id;
+      const newCount = (dhikrStats.count || 0) + 1;
+      const newSessionCount = isSession 
+        ? (dhikrStats.sessionCount || 0) + 1 
+        : dhikrStats.sessionCount;
+      
       return {
         ...prev,
         [today]: {
           ...todayStats,
           [currentDhikr.id]: {
             ...dhikrStats,
-            count: (dhikrStats.count || 0) + 1,
+            count: newCount,
             sessionCount: newSessionCount
           }
         }
@@ -598,12 +607,16 @@ export default function App() {
     setDailyStats(prev => {
       const todayStats = prev[today] || {};
       const dhikrStats = todayStats[currentDhikr.id] || { count: 0, timeSpent: 0 };
+      const isSession = activeTasbeehContext === currentDhikr.id;
+      
       return {
         ...prev,
         [today]: {
           ...todayStats,
           [currentDhikr.id]: {
             ...dhikrStats,
+            count: isSession ? dhikrStats.count : 0,
+            timeSpent: isSession ? dhikrStats.timeSpent : 0,
             sessionCount: 0,
             sessionTimeSpent: 0
           }
@@ -622,10 +635,12 @@ export default function App() {
       const todayStats = prev[today] || {};
       const newTodayStats = { ...todayStats };
       
-      // Reset sessionCount and sessionTimeSpent for all dhikrs in today's stats
+      // Reset everything for all dhikrs in today's stats
       Object.keys(newTodayStats).forEach(id => {
         newTodayStats[id] = {
           ...newTodayStats[id],
+          count: 0,
+          timeSpent: 0,
           sessionCount: 0,
           sessionTimeSpent: 0
         };
@@ -649,6 +664,7 @@ export default function App() {
   const jumpToDhikr = (idx: number) => {
     if (dhikrList.length === 0 || idx < 0 || idx >= dhikrList.length) return;
     setCurrentIndex(idx);
+    setActiveTasbeehContext(null);
     const dhikr = dhikrList[idx];
     const defaultTime = getDefaultTimerForDhikr(dhikr);
     setTimeLeft(defaultTime);
@@ -660,6 +676,7 @@ export default function App() {
     if (dhikrList.length === 0) return;
     setCurrentIndex((prev) => {
       const nextIdx = (prev + 1) % dhikrList.length;
+      setActiveTasbeehContext(null);
       const nextDhikr = dhikrList[nextIdx];
       const defaultTime = getDefaultTimerForDhikr(nextDhikr);
       setTimeLeft(defaultTime);
@@ -673,6 +690,7 @@ export default function App() {
     if (dhikrList.length === 0) return;
     setCurrentIndex((prev) => {
       const prevIdx = (prev - 1 + dhikrList.length) % dhikrList.length;
+      setActiveTasbeehContext(null);
       const prevDhikr = dhikrList[prevIdx];
       const defaultTime = getDefaultTimerForDhikr(prevDhikr);
       setTimeLeft(defaultTime);
@@ -816,7 +834,8 @@ export default function App() {
             dhikrList={dhikrList}
             onNavigateToTasbeeh={(item, isEvening) => {
               const mappedId = TASBEEH_MAPPING[item.id] || item.id;
-              let idx = dhikrList.findIndex(d => d.id === mappedId);
+              let currentList = [...dhikrList];
+              let idx = currentList.findIndex(d => d.id === mappedId);
 
               if (idx === -1) {
                 const newDhikr: Dhikr = {
@@ -828,11 +847,12 @@ export default function App() {
                   step: item.count,
                   defaultTimer: 5,
                 };
-                setDhikrList(prev => [...prev, newDhikr]);
-                idx = dhikrList.length;
+                currentList.push(newDhikr);
+                setDhikrList(currentList);
+                idx = currentList.length - 1;
               }
 
-              // Always reset sessionCount when navigating to Tasbeeh
+              // Always reset sessionCount when navigating to Tasbeeh from ME
               const today = getTodayStr();
               setDailyStats(prev => {
                 const todayStats = prev[today] || {};
